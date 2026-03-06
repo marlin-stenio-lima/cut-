@@ -27,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true)
 
     const fetchProfile = async (userId: string) => {
+        console.log(`[AuthContext] Fetching profile for ${userId}...`)
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -35,31 +36,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single()
 
             if (error) {
-                console.warn('Profile not found or error fetching:', error.message)
+                console.warn('[AuthContext] Profile not found or error fetching:', error.message)
                 setProfile(null)
             } else {
+                console.log('[AuthContext] Profile loaded:', data.role)
                 setProfile(data)
             }
         } catch (err) {
-            console.error('Error in fetchProfile:', err)
+            console.error('[AuthContext] Error in fetchProfile:', err)
             setProfile(null)
         }
     }
 
     useEffect(() => {
+        console.log('[AuthContext] Initializing AuthProvider...')
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
+            console.log('[AuthContext] Session received:', session ? 'User present' : 'No user')
             setSession(session)
             setUser(session?.user ?? null)
             if (session?.user) {
-                fetchProfile(session.user.id).finally(() => setLoading(false))
+                fetchProfile(session.user.id).finally(() => {
+                    console.log('[AuthContext] Initialization complete (User found)')
+                    setLoading(false)
+                })
             } else {
+                console.log('[AuthContext] Initialization complete (No user)')
                 setLoading(false)
             }
+        }).catch(err => {
+            console.error('[AuthContext] getSession error:', err)
+            setLoading(false)
         })
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log(`[AuthContext] Auth state change: ${event}`)
             setSession(session)
             setUser(session?.user ?? null)
             if (session?.user) {
@@ -81,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const refreshProfile = async () => {
         if (user) {
+            console.log('[AuthContext] Manual profile refresh requested...')
             await fetchProfile(user.id)
         }
     }
