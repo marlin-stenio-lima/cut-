@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const ProfileSelectionPage: React.FC = () => {
     const navigate = useNavigate()
-    const { user, refreshProfile } = useAuth()
+    const { user, refreshProfile, updateProfileLocally } = useAuth()
     const [isSubmitting, setIsSubmitting] = React.useState<string | null>(null)
 
     const handleSelectProfile = async (type: 'client' | 'editor') => {
@@ -34,10 +34,13 @@ const ProfileSelectionPage: React.FC = () => {
 
             console.log(`Profile successfully updated to ${type}`)
 
-            // Refresh the profile in AuthContext so redirection logic kicks in
-            await refreshProfile()
+            // Update AuthContext locally for an instant UI response
+            updateProfileLocally({ role: type })
 
-            // Navigate to dashboard
+            // Fire refreshProfile in the background without awaiting it
+            refreshProfile().catch(console.error)
+
+            // Navigate to dashboard immediately
             navigate('/dashboard')
 
         } catch (error: any) {

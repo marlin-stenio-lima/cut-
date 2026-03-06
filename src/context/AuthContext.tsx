@@ -9,6 +9,7 @@ interface AuthContextType {
     loading: boolean
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
+    updateProfileLocally: (data: any) => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     signOut: async () => { },
     refreshProfile: async () => { },
+    updateProfileLocally: () => { },
 })
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -99,8 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }
 
+    const updateProfileLocally = (data: any) => {
+        console.log('[AuthContext] Optimistic profile update:', data.role)
+        setProfile((prev: any) => ({ ...prev, ...data }))
+    }
+
     return (
-        <AuthContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile, updateProfileLocally }}>
             {children}
         </AuthContext.Provider>
     )
