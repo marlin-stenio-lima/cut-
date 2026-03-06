@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Clapperboard, Star, ArrowRight, CheckCircle, Zap, Shield, Play } from 'lucide-react'
+import { Clapperboard, Star, ArrowRight, CheckCircle, Zap, Shield } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
     return (

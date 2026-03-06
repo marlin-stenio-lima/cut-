@@ -1,34 +1,49 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Video, CheckCircle } from 'lucide-react'
+import { User, Video, CheckCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
+import { useAuth } from '../../context/AuthContext'
 
 const ProfileSelectionPage: React.FC = () => {
     const navigate = useNavigate()
+    const { user } = useAuth()
+    const [isSubmitting, setIsSubmitting] = React.useState<string | null>(null)
 
     const handleSelectProfile = async (type: 'client' | 'editor') => {
+        if (!user) {
+            console.error('No user found in auth context')
+            return
+        }
+
+        console.log(`Starting profile update to ${type} for user ${user.id}...`)
+        setIsSubmitting(type)
+
         try {
-            const { data: { user } } = await supabase.auth.getUser()
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    role: type,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', user.id)
 
-            if (user) {
-                const { error } = await supabase
-                    .from('profiles')
-                    .update({
-                        role: type,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', user.id)
-
-                if (error) {
-                    throw error
-                }
-
-                console.log(`Profile updated to ${type} for user ${user.id}`)
-                navigate('/dashboard')
+            if (error) {
+                console.error('Supabase error updating profile:', error)
+                throw error
             }
-        } catch (error) {
+
+            console.log(`Profile successfully updated to ${type}`)
+
+            // Allow some time for session/profile refresh if needed, then navigate
+            setTimeout(() => {
+                navigate('/dashboard')
+            }, 500)
+
+        } catch (error: any) {
             console.error('Error selecting profile:', error)
-            alert('Erro ao salvar seu perfil. Por favor, tente novamente.')
+            alert(`Erro ao salvar seu perfil: ${error.message || 'Erro desconhecido'}`)
+        } finally {
+            setIsSubmitting(null)
         }
     }
 
@@ -42,23 +57,30 @@ const ProfileSelectionPage: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
                     {/* Client Option */}
-                    <div
+                    <button
                         onClick={() => handleSelectProfile('client')}
+                        disabled={isSubmitting !== null}
                         className="glass"
                         style={{
                             padding: '48px',
-                            cursor: 'pointer',
+                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s',
                             border: '1px solid var(--glass-border)',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '24px'
+                            gap: '24px',
+                            background: 'transparent',
+                            textAlign: 'center',
+                            width: '100%',
+                            opacity: isSubmitting && isSubmitting !== 'client' ? 0.5 : 1
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--accent)'
-                            e.currentTarget.style.transform = 'translateY(-8px)'
-                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(7, 182, 213, 0.1)'
+                            if (!isSubmitting) {
+                                e.currentTarget.style.borderColor = 'var(--accent)'
+                                e.currentTarget.style.transform = 'translateY(-8px)'
+                                e.currentTarget.style.boxShadow = '0 20px 40px rgba(7, 182, 213, 0.1)'
+                            }
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = 'var(--glass-border)'
@@ -70,34 +92,45 @@ const ProfileSelectionPage: React.FC = () => {
                             <User size={40} className="accent-cyan" />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px' }}>Sou Cliente</h3>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--text-main)' }}>Sou Cliente</h3>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
                                 Quero encontrar os melhores editores para meus projetos de vídeo.
                             </p>
                         </div>
                         <div style={{ marginTop: 'auto', color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            Selecionar <CheckCircle size={18} />
+                            {isSubmitting === 'client' ? (
+                                <>Processando... <Loader2 size={18} className="spin" /></>
+                            ) : (
+                                <>Selecionar <CheckCircle size={18} /></>
+                            )}
                         </div>
-                    </div>
+                    </button>
 
                     {/* Editor Option */}
-                    <div
+                    <button
                         onClick={() => handleSelectProfile('editor')}
+                        disabled={isSubmitting !== null}
                         className="glass"
                         style={{
                             padding: '48px',
-                            cursor: 'pointer',
+                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s',
                             border: '1px solid var(--glass-border)',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '24px'
+                            gap: '24px',
+                            background: 'transparent',
+                            textAlign: 'center',
+                            width: '100%',
+                            opacity: isSubmitting && isSubmitting !== 'editor' ? 0.5 : 1
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--primary)'
-                            e.currentTarget.style.transform = 'translateY(-8px)'
-                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(99, 102, 241, 0.1)'
+                            if (!isSubmitting) {
+                                e.currentTarget.style.borderColor = 'var(--primary)'
+                                e.currentTarget.style.transform = 'translateY(-8px)'
+                                e.currentTarget.style.boxShadow = '0 20px 40px rgba(99, 102, 241, 0.1)'
+                            }
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = 'var(--glass-border)'
@@ -109,15 +142,19 @@ const ProfileSelectionPage: React.FC = () => {
                             <Video size={40} style={{ color: 'var(--primary)' }} />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px' }}>Sou Editor</h3>
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--text-main)' }}>Sou Editor</h3>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
                                 Quero trabalhar em projetos incríveis e mostrar meu portfólio.
                             </p>
                         </div>
                         <div style={{ marginTop: 'auto', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            Selecionar <CheckCircle size={18} />
+                            {isSubmitting === 'editor' ? (
+                                <>Processando... <Loader2 size={18} className="spin" /></>
+                            ) : (
+                                <>Selecionar <CheckCircle size={18} /></>
+                            )}
                         </div>
-                    </div>
+                    </button>
                 </div>
             </div>
         </div>
