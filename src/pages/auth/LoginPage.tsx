@@ -1,0 +1,106 @@
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, Lock, LogIn, Github } from 'lucide-react'
+import { supabase } from '../../services/supabase'
+
+const LoginPage: React.FC = () => {
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const navigate = useNavigate()
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        setError(null)
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        })
+
+        if (error) {
+            setError(error.message)
+            setLoading(false)
+        } else if (data.user) {
+            // Check if user has a profile with a role
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', data.user.id)
+                .single()
+
+            if (profile?.role) {
+                navigate('/dashboard')
+            } else {
+                navigate('/profile-selection')
+            }
+        }
+    }
+
+    return (
+        <div className="auth-container">
+            <div className="glass auth-card">
+                <div className="auth-header">
+                    <div className="logo-placeholder">
+                        <span className="accent-cyan">Cut</span> House
+                    </div>
+                    <h2>Bem-vindo de volta!</h2>
+                    <p>Entre para gerenciar seus projetos de vídeo.</p>
+                </div>
+
+                <form onSubmit={handleLogin} className="auth-form">
+                    {error && <div className="error-message">{error}</div>}
+
+                    <div className="input-group">
+                        <label><Mail size={18} /> E-mail</label>
+                        <input
+                            type="email"
+                            placeholder="seu@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <div className="input-group">
+                        <label><Lock size={18} /> Senha</label>
+                        <input
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <div className="auth-actions">
+                        <Link to="/forgot-password">Esqueci minha senha</Link>
+                    </div>
+
+                    <button type="submit" className="glow-btn full-width" disabled={loading}>
+                        {loading ? 'Entrando...' : <><LogIn size={20} /> Entrar</>}
+                    </button>
+                </form>
+
+                <div className="auth-divider">
+                    <span>ou continue com</span>
+                </div>
+
+                <div className="social-auth">
+                    <button className="glass social-btn"><Github size={20} /> GitHub</button>
+                    <button className="glass social-btn">
+                        <img src="https://www.google.com/favicon.ico" alt="Google" width="20" /> Google
+                    </button>
+                </div>
+
+                <p className="auth-footer">
+                    Não tem uma conta? <Link to="/register" className="accent-cyan">Criar uma conta</Link>
+                </p>
+            </div>
+        </div>
+    )
+}
+
+export default LoginPage
