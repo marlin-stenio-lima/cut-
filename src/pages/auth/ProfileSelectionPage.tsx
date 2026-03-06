@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const ProfileSelectionPage: React.FC = () => {
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const { user, refreshProfile } = useAuth()
     const [isSubmitting, setIsSubmitting] = React.useState<string | null>(null)
 
     const handleSelectProfile = async (type: 'client' | 'editor') => {
@@ -34,10 +34,11 @@ const ProfileSelectionPage: React.FC = () => {
 
             console.log(`Profile successfully updated to ${type}`)
 
-            // Allow some time for session/profile refresh if needed, then navigate
-            setTimeout(() => {
-                navigate('/dashboard')
-            }, 500)
+            // Refresh the profile in AuthContext so redirection logic kicks in
+            await refreshProfile()
+
+            // Navigate to dashboard
+            navigate('/dashboard')
 
         } catch (error: any) {
             console.error('Error selecting profile:', error)
