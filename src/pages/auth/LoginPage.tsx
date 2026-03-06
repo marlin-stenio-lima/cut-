@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, LogIn, Github } from 'lucide-react'
+import { Mail, Lock, LogIn, Github, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 
 const LoginPage: React.FC = () => {
@@ -8,6 +8,7 @@ const LoginPage: React.FC = () => {
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
     const navigate = useNavigate()
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -57,6 +58,8 @@ const LoginPage: React.FC = () => {
                         <label><Mail size={18} /> E-mail</label>
                         <input
                             type="email"
+                            name="email"
+                            autoComplete="email"
                             placeholder="seu@email.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -66,13 +69,25 @@ const LoginPage: React.FC = () => {
 
                     <div className="input-group">
                         <label><Lock size={18} /> Senha</label>
-                        <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
+                        <div className="password-input-container">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                autoComplete="current-password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="auth-actions">
