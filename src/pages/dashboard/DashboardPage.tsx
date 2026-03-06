@@ -3,7 +3,13 @@ import { useAuth } from '../../context/AuthContext'
 import DashboardLayout from '../../components/dashboard/DashboardLayout'
 import ClientDashboard from './ClientDashboard'
 import EditorDashboard from './EditorDashboard'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Routes, Route } from 'react-router-dom'
+import ChatPage from './ChatPage'
+import SettingsPage from './SettingsPage'
+import NewProjectPage from './client/NewProjectPage'
+import MyProjectsPage from './client/MyProjectsPage'
+import ExplorePage from './editor/ExplorePage'
+import MyWorkPage from './editor/MyWorkPage'
 
 const DashboardPage: React.FC = () => {
     const { profile, loading, user } = useAuth()
@@ -36,7 +42,33 @@ const DashboardPage: React.FC = () => {
 
     return (
         <DashboardLayout role={role}>
-            {role === 'client' ? <ClientDashboard /> : <EditorDashboard />}
+            <Routes>
+                {/* Default Dashboard Home */}
+                <Route path="/" element={role === 'client' ? <ClientDashboard /> : <EditorDashboard />} />
+
+                {/* Shared Routes */}
+                <Route path="chat" element={<ChatPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+
+                {/* Client Only Routes */}
+                {role === 'client' && (
+                    <>
+                        <Route path="new-project" element={<NewProjectPage />} />
+                        <Route path="projects" element={<MyProjectsPage />} />
+                    </>
+                )}
+
+                {/* Editor Only Routes */}
+                {role === 'editor' && (
+                    <>
+                        <Route path="explore" element={<ExplorePage />} />
+                        <Route path="work" element={<MyWorkPage />} />
+                    </>
+                )}
+
+                {/* Catch-all to default dashboard */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
         </DashboardLayout>
     )
 }

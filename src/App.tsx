@@ -40,7 +40,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile-selection" element={<ProfileSelectionPage />} />
-          <Route path="/dashboard" element={
+          <Route path="/dashboard/*" element={
             <PrivateRoute>
               <DashboardPage />
             </PrivateRoute>
