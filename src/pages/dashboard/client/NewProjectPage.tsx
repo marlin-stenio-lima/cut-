@@ -68,7 +68,7 @@ const NewProjectPage: React.FC = () => {
                                     onChange={(e) => setData({ ...data, title: e.target.value })}
                                 />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            <div className="grid-responsive-2" style={{ gap: '15px' }}>
                                 <div className="form-group">
                                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tipo de Vídeo</label>
                                     <select
@@ -154,7 +154,7 @@ const NewProjectPage: React.FC = () => {
                             <Calendar size={20} color="var(--accent)" /> Prazos e Orçamento
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            <div className="grid-responsive-2" style={{ gap: '15px' }}>
                                 <div className="form-group">
                                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Prazo Desejado</label>
                                     <input
@@ -193,7 +193,7 @@ const NewProjectPage: React.FC = () => {
                                 <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '5px' }}>Título:</strong>
                                 {data.title || 'Não informado'}
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            <div className="grid-responsive-2" style={{ gap: '15px' }}>
                                 <div className="summary-item" style={{ padding: '15px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
                                     <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '5px' }}>Tipo:</strong>
                                     {data.videoType || 'Não selecionado'}

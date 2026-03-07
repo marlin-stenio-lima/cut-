@@ -4,9 +4,9 @@ import { Plus, Briefcase, Clock, CheckCircle, TrendingUp } from 'lucide-react'
 const ClientDashboard: React.FC = () => {
     return (
         <div>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
+            <header className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Olá, Cliente! 👋</h1>
+                    <h1 className="dashboard-header-title" style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Olá, Cliente! 👋</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Bem-vindo de volta ao seu centro de comando.</p>
                 </div>
                 <button className="glow-btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px' }}>
@@ -15,7 +15,7 @@ const ClientDashboard: React.FC = () => {
             </header>
 
             {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '48px' }}>
+            <div className="grid-responsive-4" style={{ marginBottom: '48px' }}>
                 {[
                     { label: 'Projetos Ativos', value: '3', icon: <Briefcase className="accent-cyan" />, trend: '+1' },
                     { label: 'Em Revisão', value: '12', icon: <Clock style={{ color: '#fbbf24' }} />, trend: 'Em dia' },
@@ -50,9 +50,7 @@ const ClientDashboard: React.FC = () => {
                         { name: 'Instagram Reels - Lançamento', editor: 'Ana Oliveira', status: 'Revisão', progress: 90 },
                         { name: 'Cinematic Teaser - Produto X', editor: 'Pendente', status: 'Aguardando', progress: 0 },
                     ].map((project, i) => (
-                        <div key={i} style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                        <div key={i} className="grid-responsive-4 list-responsive" style={{
                             alignItems: 'center',
                             padding: '16px',
                             borderRadius: '16px',

@@ -6,9 +6,9 @@ const EditorDashboard: React.FC = () => {
 
     return (
         <div>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
+            <header className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Olá, Editor! 🎨</h1>
+                    <h1 className="dashboard-header-title" style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Olá, Editor! 🎨</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Prepare suas ferramentas, grandes projetos esperam por você.</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(255,255,255,0.03)', padding: '8px 16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -42,9 +42,9 @@ const EditorDashboard: React.FC = () => {
                 </div>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
+            <div className="flex-responsive-row" style={{ gap: '32px' }}>
                 {/* Main Content Area */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '32px' }}>
                     {/* Marketplace Preview */}
                     <div className="glass" style={{ padding: '32px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -54,7 +54,7 @@ const EditorDashboard: React.FC = () => {
                             <button style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Explorar todos</button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        <div className="grid-responsive-2" style={{ gap: '20px' }}>
                             {[
                                 { title: 'Vlog de Viagem - Japão', price: 'R$ 800', deadline: '3 dias', tags: ['Premiere', 'Color Grade'] },
                                 { title: 'Comercial Tech SaaS', price: 'R$ 1.500', deadline: '5 dias', tags: ['After Effects', 'Motion'] },
@@ -96,7 +96,7 @@ const EditorDashboard: React.FC = () => {
                 </div>
 
                 {/* Sidebar Stats */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px' }}>Minhas Métricas</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

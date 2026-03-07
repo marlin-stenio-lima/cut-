@@ -320,3 +320,141 @@ input:-webkit-autofill:active {
   text-decoration: none;
   font-weight: 600;
 }
+
+/* Layout and Responsive Utilities */
+.sidebar {
+  width: 280px;
+  background: rgba(15, 15, 25, 0.85) !important;
+  backdrop-filter: blur(15px) !important;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content {
+  margin-left: 280px;
+  flex: 1;
+  padding: 40px 60px;
+  min-width: 0;
+  /* Prevents flexbox overflow */
+  transition: margin-left 0.3s ease;
+}
+
+.mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(15, 15, 25, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 95;
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.menu-overlay.open {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Grids */
+.grid-responsive-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.grid-responsive-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.flex-responsive-row {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+}
+
+/* Media Queries */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 24px;
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  .grid-responsive-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .flex-responsive-row {
+    flex-direction: column;
+  }
+
+  .flex-responsive-row>div:first-child {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px;
+  }
+
+  .grid-responsive-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-responsive-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Make lists flex column instead of grid on very small screens if needed */
+  .list-responsive {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px;
+  }
+
+  .dashboard-header-title {
+    font-size: 1.5rem !important;
+  }
+
+  .form-group-split {
+    grid-template-columns: 1fr !important;
+  }
+}
