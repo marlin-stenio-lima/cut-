@@ -17,11 +17,9 @@ const LoginPage: React.FC = () => {
         setError(null)
 
         const timeout = setTimeout(() => {
-            if (loading) {
-                setLoading(false)
-                setError('A requisição está demorando mais que o esperado. Verifique sua conexão.')
-            }
-        }, 15000)
+            setLoading(false)
+            setError('A requisição de login falhou ou demorou demais. Tente novamente.')
+        }, 10000)
 
         try {
             console.log('[LoginPage] Attempting login for:', email)

@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const ProfileSelectionPage: React.FC = () => {
     const navigate = useNavigate()
-    const { user, profile, refreshProfile, updateProfileLocally } = useAuth()
+    const { user, profile, updateProfileLocally } = useAuth()
     const [isSubmitting, setIsSubmitting] = React.useState<string | null>(null)
 
     React.useEffect(() => {
@@ -43,9 +43,6 @@ const ProfileSelectionPage: React.FC = () => {
 
             // Update AuthContext locally for an instant UI response
             updateProfileLocally({ role: type })
-
-            // Fire refreshProfile in the background without awaiting it
-            refreshProfile().catch(console.error)
 
             // Navigate to dashboard immediately
             navigate('/dashboard')

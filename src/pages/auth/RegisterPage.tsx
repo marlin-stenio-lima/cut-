@@ -26,11 +26,9 @@ const RegisterPage: React.FC = () => {
         }
 
         const timeout = setTimeout(() => {
-            if (loading) {
-                setLoading(false)
-                setError('O cadastro está demorando mais que o esperado. Verifique sua conexão.')
-            }
-        }, 15000)
+            setLoading(false)
+            setError('O cadastro está demorando além do normal. O servidor pode estar lento. Tente novamente em instantes.')
+        }, 10000)
 
         try {
             console.log('[RegisterPage] Attempting signup for:', email)
