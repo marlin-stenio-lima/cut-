@@ -152,15 +152,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                             </div>
                         </div>
                     </div>
-            </div>
-        </aside>
+                </aside>
 
-            {/* Main Content */ }
-    <main className="main-content">
-        {children}
-    </main>
-        </div >
-    </div >
+                {/* Main Content */}
+                <main className="main-content">
+                    {children}
+                </main>
+            </div>
+        </div>
     )
 }
 
