@@ -16,6 +16,13 @@ const LoginPage: React.FC = () => {
         setLoading(true)
         setError(null)
 
+        const timeout = setTimeout(() => {
+            if (loading) {
+                setLoading(false)
+                setError('A requisição está demorando mais que o esperado. Verifique sua conexão.')
+            }
+        }, 15000)
+
         try {
             console.log('[LoginPage] Attempting login for:', email)
             const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -26,33 +33,23 @@ const LoginPage: React.FC = () => {
             if (authError) throw authError
 
             if (data.user) {
-                console.log('[LoginPage] Auth success, checking profile role...')
-                // Check if user has a profile with a role
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', data.user.id)
-                    .single()
-
-                if (profileError && profileError.code !== 'PGRST116') {
-                    console.warn('[LoginPage] Profile fetch warning:', profileError.message)
-                }
-
-                if (profile?.role) {
-                    console.log('[LoginPage] Role found:', profile.role, 'Navigating to /dashboard')
+                console.log('[LoginPage] Auth success! Waiting for AuthContext to redirect...')
+                // No need to navigate manually, AuthProvider + App routing should handle it.
+                // But we wait a bit to see if we navigate automatically.
+                setTimeout(() => {
                     navigate('/dashboard')
-                } else {
-                    console.log('[LoginPage] No role found, navigating to /profile-selection')
-                    navigate('/profile-selection')
-                }
+                }, 500)
             }
         } catch (error: any) {
             console.error('[LoginPage] Login error:', error.message)
             setError(error.message === 'Invalid login credentials'
                 ? 'E-mail ou senha incorretos.'
-                : 'Ocorreu um erro ao entrar. Tente novamente.')
-        } finally {
+                : 'Erro ao entrar: ' + error.message)
             setLoading(false)
+        } finally {
+            clearTimeout(timeout)
+            // Note: We don't always set loading false here because if successful, 
+            // we want to stay in loading state until navigation occurs.
         }
     }
 

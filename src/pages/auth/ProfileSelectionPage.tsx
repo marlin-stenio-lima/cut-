@@ -21,11 +21,11 @@ const ProfileSelectionPage: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('profiles')
-                .update({
+                .upsert({
+                    id: user.id,
                     role: type,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', user.id)
 
             if (error) {
                 console.error('Supabase error updating profile:', error)
