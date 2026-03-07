@@ -99,17 +99,6 @@ const LoginPage: React.FC = () => {
                     </button>
                 </form>
 
-                <div className="auth-divider">
-                    <span>ou continue com</span>
-                </div>
-
-                <div className="social-auth">
-                    <button className="glass social-btn"><Github size={20} /> GitHub</button>
-                    <button className="glass social-btn">
-                        <img src="https://www.google.com/favicon.ico" alt="Google" width="20" /> Google
-                    </button>
-                </div>
-
                 <p className="auth-footer">
                     Não tem uma conta? <Link to="/register" className="accent-cyan">Criar uma conta</Link>
                 </p>
