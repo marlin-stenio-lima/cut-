@@ -6,8 +6,15 @@ import { useAuth } from '../../context/AuthContext'
 
 const ProfileSelectionPage: React.FC = () => {
     const navigate = useNavigate()
-    const { user, refreshProfile, updateProfileLocally } = useAuth()
+    const { user, profile, refreshProfile, updateProfileLocally } = useAuth()
     const [isSubmitting, setIsSubmitting] = React.useState<string | null>(null)
+
+    React.useEffect(() => {
+        if (profile?.role) {
+            console.log('[ProfileSelection] User already has a role, redirecting to dashboard...')
+            navigate('/dashboard')
+        }
+    }, [profile, navigate])
 
     const handleSelectProfile = async (type: 'client' | 'editor') => {
         if (!user) {
