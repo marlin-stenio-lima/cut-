@@ -16,27 +16,43 @@ const LoginPage: React.FC = () => {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
+        try {
+            console.log('[LoginPage] Attempting login for:', email)
+            const { data, error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            })
 
-        if (error) {
-            setError(error.message)
-            setLoading(false)
-        } else if (data.user) {
-            // Check if user has a profile with a role
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', data.user.id)
-                .single()
+            if (authError) throw authError
 
-            if (profile?.role) {
-                navigate('/dashboard')
-            } else {
-                navigate('/profile-selection')
+            if (data.user) {
+                console.log('[LoginPage] Auth success, checking profile role...')
+                // Check if user has a profile with a role
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', data.user.id)
+                    .single()
+
+                if (profileError && profileError.code !== 'PGRST116') {
+                    console.warn('[LoginPage] Profile fetch warning:', profileError.message)
+                }
+
+                if (profile?.role) {
+                    console.log('[LoginPage] Role found:', profile.role, 'Navigating to /dashboard')
+                    navigate('/dashboard')
+                } else {
+                    console.log('[LoginPage] No role found, navigating to /profile-selection')
+                    navigate('/profile-selection')
+                }
             }
+        } catch (error: any) {
+            console.error('[LoginPage] Login error:', error.message)
+            setError(error.message === 'Invalid login credentials'
+                ? 'E-mail ou senha incorretos.'
+                : 'Ocorreu um erro ao entrar. Tente novamente.')
+        } finally {
+            setLoading(false)
         }
     }
 
