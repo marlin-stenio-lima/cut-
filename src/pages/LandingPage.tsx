@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Clapperboard, Star, ArrowRight, CheckCircle, Zap, Shield } from 'lucide-react'
+import { Star, ArrowRight, CheckCircle, Zap, Shield } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
     return (
@@ -20,8 +20,8 @@ const LandingPage: React.FC = () => {
                 backdropFilter: 'blur(20px)',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                    <Clapperboard className="accent-cyan" size={24} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                    <img src="/logo.jpg" alt="Cut House" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
                     <span>Cut House</span>
                 </div>
 
@@ -287,8 +287,8 @@ const LandingPage: React.FC = () => {
             <footer style={{ padding: '80px 80px', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#0B0B11' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.4rem', fontWeight: 700, marginBottom: '16px' }}>
-                            <Clapperboard className="accent-cyan" size={24} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.4rem', fontWeight: 700, marginBottom: '16px' }}>
+                            <img src="/logo.jpg" alt="Cut House" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
                             <span>Cut House</span>
                         </div>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>© 2026 Cut House. Elevando o nível do seu conteúdo.</p>

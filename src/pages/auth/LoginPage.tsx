@@ -55,8 +55,8 @@ const LoginPage: React.FC = () => {
         <div className="auth-container">
             <div className="glass auth-card">
                 <div className="auth-header">
-                    <div className="logo-placeholder">
-                        <span className="accent-cyan">Cut</span> House
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                        <img src="/logo.jpg" alt="Cut House" style={{ height: '64px', borderRadius: '12px' }} />
                     </div>
                     <h2>Bem-vindo de volta!</h2>
                     <p>Entre para gerenciar seus projetos de vídeo.</p>

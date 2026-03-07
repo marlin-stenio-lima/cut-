@@ -7,7 +7,6 @@ import {
     Settings,
     LogOut,
     PlusCircle,
-    Clapperboard,
     Briefcase
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -48,8 +47,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                 height: '100vh',
                 zIndex: 100
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.4rem', fontWeight: 700, marginBottom: '48px', padding: '0 12px' }}>
-                    <Clapperboard className="accent-cyan" size={24} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.4rem', fontWeight: 700, marginBottom: '48px', padding: '0 12px' }}>
+                    <img src="/logo.jpg" alt="Cut House" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
                     <span>Cut House</span>
                 </div>
 
