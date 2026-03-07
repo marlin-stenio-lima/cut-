@@ -25,7 +25,13 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null)
     const [user, setUser] = useState<User | null>(null)
-    const [profile, setProfile] = useState<any | null>(null)
+    const [profile, setProfile] = useState<any | null>(() => {
+        const cached = localStorage.getItem('cut_house_profile')
+        if (cached) {
+            try { return JSON.parse(cached) } catch (e) { return null }
+        }
+        return null
+    })
     const [loading, setLoading] = useState(true)
 
     const fetchProfile = async (userId: string) => {
@@ -46,28 +52,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (error) {
                 console.warn('[AuthContext] Profile not found or error fetching:', error.message)
-                setProfile(null)
+                // We keep the cached profile if network fails, to prevent kicking the user out
             } else {
                 console.log('[AuthContext] Profile loaded:', data?.role)
                 setProfile(data)
+                localStorage.setItem('cut_house_profile', JSON.stringify(data))
             }
         } catch (err: any) {
             console.error('[AuthContext] Error in fetchProfile:', err.message)
-            setProfile(null)
+            // Keep cached profile on timeout
         }
     }
 
     useEffect(() => {
         let mounted = true
         console.log('[AuthContext] Initializing AuthProvider with v2 storage...')
-
-        // Fallback safety timeout for the entire initialization
-        const globalFallback = setTimeout(() => {
-            if (mounted && loading) {
-                console.warn('[AuthContext] Global fallback timeout hit. Forcing stop loading.')
-                setLoading(false)
-            }
-        }, 25000)
 
         const initializeAuth = async () => {
             try {
@@ -93,7 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
 
                 if (session?.user && mounted) {
-                    await fetchProfile(session.user.id)
+                    // Start fetching profile in background without awaiting
+                    fetchProfile(session.user.id)
                 }
             } catch (err: any) {
                 console.error('[AuthContext] Unexpected error during init:', err.message)
@@ -101,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (mounted) {
                     console.log('[AuthContext] Initialization complete, setting loading to false')
                     setLoading(false)
-                    clearTimeout(globalFallback)
                 }
             }
         }
@@ -122,10 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setSession(newSession)
             setUser(newSession?.user ?? null)
 
+            // Do not clear profile on signing out immediately to prevent UI jumps
             if (newSession?.user) {
-                await fetchProfile(newSession.user.id)
-            } else {
-                setProfile(null)
+                // Fetch in background, no await needed if we want to drop loading quickly
+                fetchProfile(newSession.user.id)
             }
 
             if (mounted) setLoading(false)
@@ -138,6 +137,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [])
 
     const signOut = async () => {
+        localStorage.removeItem('cut_house_profile')
+        setProfile(null)
         await supabase.auth.signOut()
     }
 
@@ -150,7 +151,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updateProfileLocally = (data: any) => {
         console.log('[AuthContext] Optimistic profile update:', data.role)
-        setProfile((prev: any) => ({ ...prev, ...data }))
+        setProfile((prev: any) => {
+            const updated = { ...prev, ...data }
+            localStorage.setItem('cut_house_profile', JSON.stringify(updated))
+            return updated
+        })
     }
 
     return (

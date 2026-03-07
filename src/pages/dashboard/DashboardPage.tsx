@@ -17,19 +17,7 @@ const DashboardPage: React.FC = () => {
     console.log('[DashboardPage] Render:', { user: !!user, hasProfile: !!profile, role: profile?.role, loading })
 
     if (loading) {
-        return (
-            <div className="auth-container">
-                <div style={{ textAlign: 'center' }}>
-                    <div className="glow-cyan" style={{ width: '40px', height: '40px', borderRadius: '50%', border: '4px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }}></div>
-                    <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Carregando seu espaço...</p>
-                </div>
-                <style>{`
-                    @keyframes spin {
-                        to { transform: rotate(360deg); }
-                    }
-                `}</style>
-            </div>
-        )
+        return null
     }
 
     // If logged in but no profile/role yet, redirect to selection

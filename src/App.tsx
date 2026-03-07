@@ -13,14 +13,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   console.log('[PrivateRoute] Check:', { authenticated: !!session, loading })
 
   if (loading) {
-    return (
-      <div className="auth-container">
-        <div style={{ textAlign: 'center' }}>
-          <div className="glow-cyan" style={{ width: '40px', height: '40px', borderRadius: '50%', border: '4px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }}></div>
-          <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Sincronizando...</p>
-        </div>
-      </div>
-    )
+    return null
   }
 
   if (!session) {
