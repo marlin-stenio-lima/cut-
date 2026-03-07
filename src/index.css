@@ -191,6 +191,12 @@ h4 {
   box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.1);
 }
 
+/* Fix dropdown options visibility */
+select.auth-input option {
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+}
+
 /* Fix browser autofill background */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
