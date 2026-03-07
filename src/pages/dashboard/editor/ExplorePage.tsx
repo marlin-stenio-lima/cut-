@@ -121,7 +121,11 @@ const ExplorePage: React.FC = () => {
                                 </span>
                             </div>
 
-                            <button className="btn-primary" style={{ width: '100%', marginTop: 'auto', outline: 'none' }}>
+                            <button
+                                className="btn-primary"
+                                style={{ width: '100%', marginTop: 'auto', outline: 'none' }}
+                                onClick={() => alert('Em breve! O sistema de propostas estará disponível nas próximas atualizações.')}
+                            >
                                 Enviar Proposta
                             </button>
                         </div>

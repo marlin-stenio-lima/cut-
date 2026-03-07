@@ -145,7 +145,10 @@ const EditorDashboard: React.FC = () => {
                                                 {job.format}
                                             </span>
                                         </div>
-                                        <button style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
+                                        <button
+                                            style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                                            onClick={() => alert('Em breve! O sistema de propostas estará disponível nas próximas atualizações.')}
+                                        >
                                             Candidatar-se
                                         </button>
                                     </div>
