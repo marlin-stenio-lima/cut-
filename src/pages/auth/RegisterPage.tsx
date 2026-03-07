@@ -25,22 +25,42 @@ const RegisterPage: React.FC = () => {
             return
         }
 
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                }
+        const timeout = setTimeout(() => {
+            if (loading) {
+                setLoading(false)
+                setError('O cadastro está demorando mais que o esperado. Verifique sua conexão.')
             }
-        })
+        }, 15000)
 
-        if (error) {
-            setError(error.message)
+        try {
+            console.log('[RegisterPage] Attempting signup for:', email)
+            const { data, error: signupError } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName,
+                    }
+                }
+            })
+
+            if (signupError) throw signupError
+
+            if (data.user) {
+                console.log('[RegisterPage] Signup success! Navigating to profile selection...')
+                // Give a tiny bit of time for the Supabase trigger to finish creating the profile
+                setTimeout(() => {
+                    navigate('/profile-selection')
+                }, 1000)
+            }
+        } catch (err: any) {
+            console.error('[RegisterPage] Registration error:', err.message)
+            setError(err.message === 'User already registered'
+                ? 'Este e-mail já está cadastrado.'
+                : 'Erro ao criar conta: ' + err.message)
             setLoading(false)
-        } else {
-            // After signup, redirect to profile selection
-            navigate('/profile-selection')
+        } finally {
+            clearTimeout(timeout)
         }
     }
 
