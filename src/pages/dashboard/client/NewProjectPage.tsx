@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Video, PenTool, Calendar, DollarSign } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Video, PenTool, Calendar, DollarSign, Loader2 } from 'lucide-react';
 import StepProgress from '../../../components/dashboard/StepProgress';
+import { supabase } from '../../../services/supabase';
+import { useAuth } from '../../../context/AuthContext';
 
 const STEPS = ['Detalhes', 'Criatividades', 'Execução', 'Resumo'];
 
@@ -18,7 +20,10 @@ interface ProjectData {
 
 const NewProjectPage: React.FC = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [currentStep, setCurrentStep] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<ProjectData>({
         title: '',
         videoType: '',
@@ -43,10 +48,39 @@ const NewProjectPage: React.FC = () => {
     };
 
     const handleSubmit = async () => {
-        console.log('Final Submission:', data);
-        // Simulate loading
-        alert('Projeto enviado com sucesso!');
-        navigate('/dashboard/projects');
+        if (!user) {
+            setError('Você precisa estar logado para criar um projeto.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            const { error: insertError } = await supabase
+                .from('projects')
+                .insert([{
+                    client_id: user.id,
+                    title: data.title,
+                    video_type: data.videoType,
+                    format: data.format,
+                    description: data.description,
+                    style: data.style,
+                    references_url: data.references,
+                    budget: parseFloat(data.budget) || null,
+                    deadline: data.deadline || null,
+                    status: 'Aberto'
+                }]);
+
+            if (insertError) throw insertError;
+
+            // Sucesso!
+            navigate('/dashboard/projects', { state: { projectCreated: true } });
+        } catch (err: any) {
+            console.error('Erro ao criar projeto:', err);
+            setError(err.message || 'Erro ao criar projeto. Tente novamente.');
+            setIsSubmitting(false);
+        }
     };
 
     const renderStep = () => {
@@ -208,6 +242,11 @@ const NewProjectPage: React.FC = () => {
                                 R$ {data.budget || '0,00'}
                             </div>
                         </div>
+                        {error && (
+                            <div className="error-message" style={{ marginTop: '20px' }}>
+                                {error}
+                            </div>
+                        )}
                         <p style={{ marginTop: '20px', fontSize: '0.85rem', textAlign: 'center' }}>
                             Ao confirmar, o projeto será listado para os melhores editores do Cut House.
                         </p>
@@ -246,10 +285,24 @@ const NewProjectPage: React.FC = () => {
                     ) : (
                         <button
                             onClick={handleSubmit}
+                            disabled={isSubmitting}
                             className="btn-primary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: 'var(--accent)', boxShadow: '0 0 20px var(--accent-glow)' }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '12px 24px',
+                                backgroundColor: isSubmitting ? 'transparent' : 'var(--accent)',
+                                boxShadow: isSubmitting ? 'none' : '0 0 20px var(--accent-glow)',
+                                border: isSubmitting ? '1px solid var(--accent)' : 'none',
+                                opacity: isSubmitting ? 0.7 : 1
+                            }}
                         >
-                            Publicar Projeto <Check size={18} />
+                            {isSubmitting ? (
+                                <>Processando <Loader2 className="animate-spin" size={18} /></>
+                            ) : (
+                                <>Publicar Projeto <Check size={18} /></>
+                            )}
                         </button>
                     )}
                 </div>
