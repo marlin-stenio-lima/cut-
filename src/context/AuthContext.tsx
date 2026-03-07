@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log(`[AuthContext] Fetching profile for ${userId}...`)
 
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+            setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
         )
 
         try {
@@ -67,13 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.warn('[AuthContext] Global fallback timeout hit. Forcing stop loading.')
                 setLoading(false)
             }
-        }, 8000)
+        }, 25000)
 
         const initializeAuth = async () => {
             try {
                 const sessionPromise = supabase.auth.getSession()
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('getSession timeout')), 4000)
+                    setTimeout(() => reject(new Error('getSession timeout')), 15000)
                 )
 
                 // Get initial session with timeout
