@@ -19,8 +19,18 @@
   /* Efeitos */
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-blur: blur(16px);
+  /* Glows */
   --glow-cyan: 0 0 25px rgba(7, 182, 213, 0.25);
   --glow-indigo: 0 0 25px rgba(99, 102, 241, 0.25);
+}
+
+body.light-theme {
+  --bg-deep: #f8fafc;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: blur(20px);
 }
 
 * {
@@ -76,7 +86,7 @@ h4 {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
   border: 1px solid var(--glass-border);
   color: var(--text-main);
   padding: 12px 24px;
@@ -90,8 +100,8 @@ h4 {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--glass-border);
+  border-color: var(--text-muted);
 }
 
 .accent-cyan {
@@ -179,7 +189,7 @@ h4 {
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   padding: 12px 16px;
-  color: white;
+  color: var(--text-main);
   outline: none;
   font-family: 'Inter', sans-serif;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -324,16 +334,20 @@ input:-webkit-autofill:active {
 /* Layout and Responsive Utilities */
 .sidebar {
   width: 280px;
-  background: rgba(15, 15, 25, 0.85) !important;
+  background: var(--bg-deep) !important;
   backdrop-filter: blur(15px) !important;
+  border-right: 1px solid var(--glass-border) !important;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .main-content {
   margin-left: 280px;
   flex: 1;
-  padding: 40px 60px;
+  padding: 0;
+  /* Changed from 40px to 0 for full screen */
   min-width: 0;
+  height: 100vh;
+  overflow: hidden;
   /* Prevents flexbox overflow */
   transition: margin-left 0.3s ease;
 }

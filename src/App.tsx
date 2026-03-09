@@ -24,23 +24,27 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>
 }
 
+import { ThemeProvider } from './context/ThemeContext'
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/profile-selection" element={<ProfileSelectionPage />} />
-          <Route path="/dashboard/*" element={
-            <PrivateRoute>
-              <DashboardPage />
-            </PrivateRoute>
-          } />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/profile-selection" element={<ProfileSelectionPage />} />
+            <Route path="/dashboard/*" element={
+              <PrivateRoute>
+                <DashboardPage />
+              </PrivateRoute>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 

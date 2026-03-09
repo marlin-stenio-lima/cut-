@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Zap, Target, Star, Loader2, Clock } from 'lucide-react'
+import { Zap, Target, Star, Loader2, Clock, X, Send } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabase'
 
@@ -7,8 +7,14 @@ const EditorDashboard: React.FC = () => {
     const { user } = useAuth()
     const [isOnline, setIsOnline] = useState(true)
     const [marketplaceProjects, setMarketplaceProjects] = useState<any[]>([])
+    const [appliedProjectIds, setAppliedProjectIds] = useState<Set<string>>(new Set())
     const [myActiveProjects, setMyActiveProjects] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+
+    // Proposal Modal State
+    const [selectedProject, setSelectedProject] = useState<any | null>(null)
+    const [coverLetter, setCoverLetter] = useState('')
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     useEffect(() => {
         const loadEditorData = async () => {
@@ -26,7 +32,17 @@ const EditorDashboard: React.FC = () => {
                 if (mError) throw mError
                 setMarketplaceProjects(marketplaceData || [])
 
-                // 2. Fetch my active projects
+                // 2. Fetch my proposals
+                const { data: proposalsData, error: proposalsError } = await supabase
+                    .from('proposals')
+                    .select('project_id')
+                    .eq('editor_id', user.id);
+
+                if (proposalsError) throw proposalsError;
+                const appliedIds = new Set(proposalsData?.map(p => p.project_id) || []);
+                setAppliedProjectIds(appliedIds);
+
+                // 3. Fetch my active projects
                 const { data: activeData, error: aError } = await supabase
                     .from('projects')
                     .select('*')
@@ -43,6 +59,48 @@ const EditorDashboard: React.FC = () => {
         }
         loadEditorData()
     }, [user])
+
+    const openProposalModal = (project: any) => {
+        setSelectedProject(project)
+        setCoverLetter('')
+    }
+
+    const closeProposalModal = () => {
+        setSelectedProject(null)
+        setCoverLetter('')
+    }
+
+    const submitProposal = async () => {
+        if (!user || !selectedProject || !coverLetter.trim()) return
+
+        setIsSubmitting(true)
+        try {
+            const { error } = await supabase
+                .from('proposals')
+                .insert({
+                    project_id: selectedProject.id,
+                    editor_id: user.id,
+                    cover_letter: coverLetter.trim()
+                })
+
+            if (error) {
+                if (error.code === '23505') {
+                    alert('Você já enviou uma proposta para este projeto.')
+                } else {
+                    throw error
+                }
+            } else {
+                setAppliedProjectIds(prev => new Set(prev).add(selectedProject.id))
+                alert('Proposta enviada com sucesso!')
+                closeProposalModal()
+            }
+        } catch (error: any) {
+            console.error('Error submitting proposal:', error)
+            alert(`Erro ao enviar proposta: ${error.message}`)
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
 
     // Calculate metrics based on active/finished projects later when implemented, using placeholders for now
     const completedCount = 0
@@ -63,14 +121,31 @@ const EditorDashboard: React.FC = () => {
     }
 
     return (
-        <div>
-            <header className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
+        <div className="glass" style={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '0',
+            overflow: 'hidden',
+            border: 'none',
+            animation: 'fadeIn 0.3s ease-out',
+            background: 'var(--bg-card)',
+            backdropFilter: 'blur(20px)'
+        }}>
+            <header className="flex-responsive-row" style={{
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '32px 40px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                background: 'rgba(0, 0, 0, 0.2)',
+                flexShrink: 0
+            }}>
                 <div>
-                    <h1 className="dashboard-header-title" style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Olá, Editor! 🎨</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>Prepare suas ferramentas, grandes projetos esperam por você.</p>
+                    <h1 className="dashboard-header-title" style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '8px', background: 'linear-gradient(to right, var(--text-main), var(--text-muted))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Olá, Editor! 🎨</h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem' }}>Prepare suas ferramentas, grandes projetos esperam por você.</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(255,255,255,0.03)', padding: '8px 16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: isOnline ? '#22c55e' : 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(255,255,255,0.03)', padding: '10px 20px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: isOnline ? '#22c55e' : 'var(--text-muted)' }}>
                         {isOnline ? 'Disponível' : 'Indisponível'}
                     </span>
                     <button
@@ -100,137 +175,218 @@ const EditorDashboard: React.FC = () => {
                 </div>
             </header>
 
-            <div className="flex-responsive-row" style={{ gap: '32px' }}>
-                {/* Main Content Area */}
-                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    {/* Marketplace Preview */}
-                    <div className="glass" style={{ padding: '32px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <Zap size={20} className="accent-cyan" /> Projetos em Destaque
-                            </h2>
-                            <button style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Explorar todos</button>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+                <div className="flex-responsive-row" style={{ gap: '32px', height: '100%' }}>
+                    {/* Main Content Area */}
+                    <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {/* Marketplace Preview */}
+                        <div className="glass" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-main)' }}>
+                                    <Zap size={20} className="accent-cyan" /> Projetos em Destaque
+                                </h2>
+                                <button
+                                    onClick={() => window.location.href = '/dashboard/explore'}
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                    Explorar todos
+                                </button>
+                            </div>
+
+                            <div className="grid-responsive-2" style={{ gap: '20px' }}>
+                                {marketplaceProjects.length === 0 ? (
+                                    <div style={{ gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        Nenhum projeto disponível no momento. Volte mais tarde!
+                                    </div>
+                                ) : (
+                                    marketplaceProjects.map((job) => {
+                                        const hasApplied = appliedProjectIds.has(job.id);
+
+                                        return (
+                                            <div key={job.id} style={{
+                                                padding: '20px',
+                                                borderRadius: '16px',
+                                                background: 'var(--bg-card)',
+                                                border: '1px solid var(--glass-border)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '16px'
+                                            }}>
+                                                <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-main)' }}>{job.title}</div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent)' }}>
+                                                        R$ {job.budget || '0'}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.85rem', color: '#fbbf24' }}>
+                                                        Prazo: {job.deadline ? new Date(job.deadline).toLocaleDateString('pt-BR') : 'A Combinar'}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <span style={{ fontSize: '0.7rem', textTransform: 'capitalize', padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                                                        {job.video_type}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                                                        {job.format}
+                                                    </span>
+                                                </div>
+                                                {hasApplied ? (
+                                                    <button
+                                                        style={{ width: '100%', padding: '12px', borderRadius: '100px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: 'none', fontWeight: 600, cursor: 'default' }}
+                                                        disabled
+                                                    >
+                                                        Já Candidatado
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        style={{ width: '100%', padding: '12px', borderRadius: '100px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                                                        onClick={() => openProposalModal(job)}
+                                                    >
+                                                        Candidatar-se
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    })
+                                )}
+                            </div>
                         </div>
 
-                        <div className="grid-responsive-2" style={{ gap: '20px' }}>
-                            {marketplaceProjects.length === 0 ? (
-                                <div style={{ gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                    Nenhum projeto disponível no momento. Volte mais tarde!
+                        {/* Active Work */}
+                        <div className="glass" style={{ padding: '32px', borderRadius: '24px', border: '1px solid var(--glass-border)' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '24px', color: 'var(--text-main)' }}>Meus Projetos Ativos</h2>
+
+                            {myActiveProjects.length === 0 ? (
+                                <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '1px dashed var(--glass-border)' }}>
+                                    <p style={{ color: 'var(--text-muted)' }}>Você não tem projetos ativos no momento. Explore o marketplace para começar!</p>
                                 </div>
                             ) : (
-                                marketplaceProjects.map((job) => (
-                                    <div key={job.id} style={{
-                                        padding: '20px',
-                                        borderRadius: '16px',
-                                        background: 'rgba(255,255,255,0.02)',
-                                        border: '1px solid rgba(255,255,255,0.05)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '16px'
-                                    }}>
-                                        <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>{job.title}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent)' }}>
-                                                R$ {job.budget || '0'}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {myActiveProjects.map((project) => (
+                                        <div key={project.id} className="grid-responsive-4 list-responsive" style={{
+                                            alignItems: 'center',
+                                            padding: '16px',
+                                            borderRadius: '16px',
+                                            background: 'var(--bg-card)',
+                                            border: '1px solid var(--glass-border)'
+                                        }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{project.title}</div>
+                                            <div>
+                                                <span style={{
+                                                    padding: '4px 12px',
+                                                    borderRadius: '100px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 700,
+                                                    background: project.status === 'Em Edição' ? 'rgba(99, 102, 241, 0.1)' : project.status === 'Revisão' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                    color: project.status === 'Em Edição' ? 'var(--primary)' : project.status === 'Revisão' ? '#fbbf24' : 'var(--text-muted)'
+                                                }}>
+                                                    {project.status}
+                                                </span>
                                             </div>
-                                            <div style={{ fontSize: '0.85rem', color: '#fbbf24' }}>
-                                                Prazo: {job.deadline ? new Date(job.deadline).toLocaleDateString('pt-BR') : 'A Combinar'}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                <Clock size={16} /> {project.deadline ? new Date(project.deadline).toLocaleDateString('pt-BR') : '-'}
+                                            </div>
+                                            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden' }}>
+                                                    <div style={{ width: `${project.progress}%`, height: '100%', background: 'var(--accent)' }}></div>
+                                                </div>
+                                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{project.progress}%</span>
                                             </div>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <span style={{ fontSize: '0.7rem', textTransform: 'capitalize', padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
-                                                {job.video_type}
-                                            </span>
-                                            <span style={{ fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
-                                                {job.format}
-                                            </span>
-                                        </div>
-                                        <button
-                                            style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-                                            onClick={() => alert('Em breve! O sistema de propostas estará disponível nas próximas atualizações.')}
-                                        >
-                                            Candidatar-se
-                                        </button>
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Active Work */}
-                    <div className="glass" style={{ padding: '32px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '24px' }}>Meus Projetos Ativos</h2>
-
-                        {myActiveProjects.length === 0 ? (
-                            <div style={{ padding: '40px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                                <p style={{ color: 'var(--text-muted)' }}>Você não tem projetos ativos no momento. Explore o marketplace para começar!</p>
-                            </div>
-                        ) : (
+                    {/* Sidebar Stats */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-main)' }}>Minhas Métricas</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {myActiveProjects.map((project) => (
-                                    <div key={project.id} className="grid-responsive-4 list-responsive" style={{
-                                        alignItems: 'center',
-                                        padding: '16px',
-                                        borderRadius: '16px',
-                                        background: 'rgba(255,255,255,0.02)',
-                                        border: '1px solid rgba(255,255,255,0.03)'
-                                    }}>
-                                        <div style={{ fontWeight: 600 }}>{project.title}</div>
-                                        <div>
-                                            <span style={{
-                                                padding: '4px 12px',
-                                                borderRadius: '100px',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 700,
-                                                background: project.status === 'Em Edição' ? 'rgba(99, 102, 241, 0.1)' : project.status === 'Revisão' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                color: project.status === 'Em Edição' ? 'var(--primary)' : project.status === 'Revisão' ? '#fbbf24' : 'var(--text-muted)'
-                                            }}>
-                                                {project.status}
-                                            </span>
+                                {[
+                                    { label: 'Avaliação Média', value: '4.9', icon: <Star size={16} fill="#FFD700" color="#FFD700" /> },
+                                    { label: 'Projetos Concluídos', value: completedCount.toString(), icon: <Target size={16} className="accent-cyan" /> },
+                                    { label: 'Ganhos no Mês', value: formattedEarnings, icon: <Zap size={16} style={{ color: 'var(--primary)' }} /> },
+                                ].map((m, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                            {m.icon} {m.label}
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            <Clock size={16} /> {project.deadline ? new Date(project.deadline).toLocaleDateString('pt-BR') : '-'}
-                                        </div>
-                                        <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden' }}>
-                                                <div style={{ width: `${project.progress}%`, height: '100%', background: 'var(--accent)' }}></div>
-                                            </div>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{project.progress}%</span>
-                                        </div>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{m.value}</div>
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Sidebar Stats */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px' }}>Minhas Métricas</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {[
-                                { label: 'Avaliação Média', value: '4.9', icon: <Star size={16} fill="#FFD700" color="#FFD700" /> },
-                                { label: 'Projetos Concluídos', value: completedCount.toString(), icon: <Target size={16} className="accent-cyan" /> },
-                                { label: 'Ganhos no Mês', value: formattedEarnings, icon: <Zap size={16} style={{ color: 'var(--primary)' }} /> },
-                            ].map((m, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                        {m.icon} {m.label}
-                                    </div>
-                                    <div style={{ fontWeight: 700 }}>{m.value}</div>
-                                </div>
-                            ))}
                         </div>
-                    </div>
 
-                    <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>Últimas Mensagens</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma mensagem nova.</p>
+                        <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-main)' }}>Últimas Mensagens</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma mensagem nova.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {/* Proposal Modal */}
+                {selectedProject && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                    }}>
+                        <div className="glass" style={{
+                            maxWidth: '600px', width: '100%', borderRadius: '24px', padding: '32px',
+                            display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative',
+                            border: '1px solid var(--glass-border)',
+                            background: 'var(--bg-deep)'
+                        }}>
+                            <button
+                                onClick={closeProposalModal}
+                                style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            >
+                                <X size={24} />
+                            </button>
+
+                            <div>
+                                <h2 style={{ fontSize: '1.5rem', marginBottom: '8px', color: 'var(--text-main)' }}>Enviar Proposta</h2>
+                                <p style={{ color: 'var(--text-muted)' }}>Você está se candidatando para: <strong style={{ color: 'var(--text-main)' }}>{selectedProject.title}</strong></p>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Carta de Apresentação</label>
+                                <textarea
+                                    value={coverLetter}
+                                    onChange={(e) => setCoverLetter(e.target.value)}
+                                    placeholder="Descreva por que você é ideal para este projeto..."
+                                    rows={6}
+                                    style={{
+                                        width: '100%', padding: '16px', borderRadius: '12px', background: 'rgba(0,0,0,0.4)',
+                                        border: '1px solid var(--glass-border)', color: 'white', outline: 'none',
+                                        resize: 'vertical', fontFamily: 'inherit'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
+                                <button
+                                    onClick={closeProposalModal}
+                                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '12px 24px', cursor: 'pointer' }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={submitProposal}
+                                    disabled={isSubmitting || !coverLetter.trim()}
+                                    className="btn-primary"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: (isSubmitting || !coverLetter.trim()) ? 0.5 : 1 }}
+                                >
+                                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                    Enviar Proposta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

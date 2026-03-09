@@ -9,9 +9,12 @@ import {
     PlusCircle,
     Briefcase,
     Menu,
-    X
+    X,
+    Sun,
+    Moon
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 
 interface DashboardLayoutProps {
     children: React.ReactNode
@@ -20,6 +23,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => {
     const { signOut, user } = useAuth()
+    const { theme, toggleTheme } = useTheme()
     const location = useLocation()
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
 
@@ -66,9 +70,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                 {/* Sidebar */}
                 <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`} style={{
                     width: '280px',
-                    background: 'rgba(15, 15, 25, 0.5)',
+                    background: 'var(--bg-deep)',
                     backdropFilter: 'blur(10px)',
-                    borderRight: '1px solid rgba(255,255,255,0.05)',
+                    borderRight: '1px solid var(--glass-border)',
                     display: 'flex',
                     flexDirection: 'column',
                     padding: '32px 20px',
@@ -106,7 +110,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                                     borderRadius: '12px',
                                     textDecoration: 'none',
                                     color: location.pathname === item.path ? 'var(--text-main)' : 'var(--text-muted)',
-                                    background: location.pathname === item.path ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                                    background: location.pathname === item.path ? 'var(--bg-card)' : 'transparent',
+                                    border: location.pathname === item.path ? '1px solid var(--glass-border)' : '1px solid transparent',
                                     transition: 'all 0.2s',
                                     fontWeight: location.pathname === item.path ? 600 : 400
                                 }}
@@ -118,7 +123,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                         ))}
                     </nav>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '24px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
+                        <button
+                            onClick={toggleTheme}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                textDecoration: 'none',
+                                color: 'var(--text-muted)',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                width: '100%',
+                                textAlign: 'left',
+                                fontSize: '1rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+                            onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                        >
+                            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                            {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+                        </button>
                         <Link to="/dashboard/settings" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '12px', textDecoration: 'none', color: 'var(--text-muted)' }}>
                             <Settings size={20} /> Configurações
                         </Link>
@@ -142,7 +171,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                             <LogOut size={20} /> Sair
                         </button>
 
-                        <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ marginTop: '24px', padding: '16px', background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                                 {user?.email?.[0].toUpperCase()}
                             </div>

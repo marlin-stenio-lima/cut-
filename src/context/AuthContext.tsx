@@ -139,7 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const signOut = async () => {
         localStorage.removeItem('cut_house_profile')
         setProfile(null)
-        await supabase.auth.signOut()
+        supabase.auth.signOut().catch(console.error)
+        window.location.replace('/')
     }
 
     const refreshProfile = async () => {

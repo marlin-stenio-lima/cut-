@@ -16,6 +16,8 @@ interface ProjectData {
     references: string;
     budget: string;
     deadline: string;
+    ryverLink: string;
+    files: any[];
 }
 
 const NewProjectPage: React.FC = () => {
@@ -24,6 +26,8 @@ const NewProjectPage: React.FC = () => {
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [data, setData] = useState<ProjectData>({
         title: '',
         videoType: '',
@@ -33,6 +37,8 @@ const NewProjectPage: React.FC = () => {
         references: '',
         budget: '',
         deadline: '',
+        ryverLink: '',
+        files: []
     });
 
     const handleNext = () => {
@@ -57,7 +63,7 @@ const NewProjectPage: React.FC = () => {
         setError(null);
 
         try {
-            const { error: insertError } = await supabase
+            const { error: insertDataError } = await supabase
                 .from('projects')
                 .insert([{
                     client_id: user.id,
@@ -69,10 +75,12 @@ const NewProjectPage: React.FC = () => {
                     references_url: data.references,
                     budget: parseFloat(data.budget) || null,
                     deadline: data.deadline || null,
+                    ryver_link: data.ryverLink,
+                    project_files: data.files,
                     status: 'Aberto'
                 }]);
 
-            if (insertError) throw insertError;
+            if (insertDataError) throw insertDataError;
 
             // Sucesso!
             navigate('/dashboard/projects', { state: { projectCreated: true } });
@@ -188,6 +196,149 @@ const NewProjectPage: React.FC = () => {
                             <Calendar size={20} color="var(--accent)" /> Prazos e Orçamento
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div className="form-group">
+                                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}>Link do Google Drive / Ryver (Opcional)</label>
+                                <input
+                                    type="url"
+                                    className="auth-input"
+                                    placeholder="https://drive.google.com/... ou https://ryver.com/..."
+                                    value={data.ryverLink}
+                                    onChange={(e) => setData({ ...data, ryverLink: e.target.value })}
+                                />
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                                    Cole o link da pasta ou arquivos se eles forem muito pesados.
+                                </span>
+                            </div>
+
+                            <div className="form-group">
+                                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}>Upload de Arquivos (Imagens, Roteiros, etc.)</label>
+                                <div style={{
+                                    border: '2px dashed var(--glass-border)',
+                                    borderRadius: '12px',
+                                    padding: '32px',
+                                    textAlign: 'center',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    cursor: uploading ? 'wait' : 'pointer',
+                                    opacity: uploading ? 0.7 : 1,
+                                    position: 'relative'
+                                }} onClick={() => !uploading && document.getElementById('file-upload')?.click()}>
+                                    {uploading ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                            <Loader2 className="animate-spin" size={32} color="var(--accent)" />
+                                            <p style={{ color: 'var(--text-main)', fontWeight: 600 }}>Fazendo upload dos arquivos...</p>
+                                        </div>
+                                    ) : uploadError ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', maxWidth: '80%' }}>
+                                                <p style={{ fontWeight: 600, marginBottom: '4px' }}>Erro no Upload</p>
+                                                <p style={{ fontSize: '0.85rem' }}>{uploadError}</p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setUploadError(null); }}
+                                                style={{ background: 'var(--primary)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', marginTop: '8px' }}
+                                            >
+                                                Tentar Novamente
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Video size={32} color="var(--accent)" style={{ opacity: 0.5, marginBottom: '12px' }} />
+                                            <p style={{ color: 'var(--text-main)', fontWeight: 600 }}>Clique para selecionar arquivos</p>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Arquivos do seu computador (Máx 500MB por projeto)</p>
+                                            <div style={{ marginTop: '12px', fontSize: '0.75rem', color: 'var(--accent)', background: 'rgba(7, 182, 213, 0.1)', padding: '6px 12px', borderRadius: '8px', display: 'inline-block' }}>
+                                                Dica: Para arquivos maiores que 500MB, use o campo de Link acima.
+                                            </div>
+                                        </>
+                                    )}
+                                    <input
+                                        type="file"
+                                        id="file-upload"
+                                        multiple
+                                        disabled={uploading}
+                                        style={{ display: 'none' }}
+                                        onChange={async (e) => {
+                                            const files = e.target.files;
+                                            if (!files || !user || files.length === 0) return;
+
+                                            setUploading(true);
+                                            setUploadError(null);
+                                            try {
+                                                const newFiles = [...data.files];
+                                                for (let i = 0; i < files.length; i++) {
+                                                    const file = files[i];
+
+                                                    // Optional: checking for 500MB limit per file on client side too
+                                                    if (file.size > 500 * 1024 * 1024) {
+                                                        setUploadError(`O arquivo ${file.name} ultrapassa o limite de 500MB.`);
+                                                        setUploading(false);
+                                                        return;
+                                                    }
+
+                                                    const fileName = `${Date.now()}-${file.name}`;
+                                                    const { data: uploadData, error: uploadErr } = await supabase.storage
+                                                        .from('project-files')
+                                                        .upload(`${user.id}/${fileName}`, file, {
+                                                            cacheControl: '3600',
+                                                            upsert: false
+                                                        });
+
+                                                    if (uploadErr) {
+                                                        console.error(`Error uploading ${file.name}:`, uploadErr);
+                                                        setUploadError(uploadErr.message === 'Bucket not found'
+                                                            ? 'O repositório "project-files" não foi encontrado no seu Supabase Storage. Crie o Bucket primeiro!'
+                                                            : `Erro ao subir ${file.name}: ${uploadErr.message}`);
+                                                        setUploading(false);
+                                                        return;
+                                                    }
+
+                                                    if (uploadData) {
+                                                        newFiles.push({
+                                                            name: file.name,
+                                                            path: uploadData.path,
+                                                            size: file.size,
+                                                            type: file.type
+                                                        });
+                                                    }
+                                                }
+                                                setData(prev => ({ ...prev, files: newFiles }));
+                                            } catch (err) {
+                                                console.error('Upload process error:', err);
+                                                alert('Ocorreu um erro inesperado no upload.');
+                                            } finally {
+                                                setUploading(false);
+                                                // Clear the input so same file can be selected again if needed
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                {data.files.length > 0 && (
+                                    <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                        {data.files.map((f, idx) => (
+                                            <div key={idx} style={{
+                                                padding: '8px 12px',
+                                                background: 'rgba(7, 182, 213, 0.1)',
+                                                borderRadius: '8px',
+                                                fontSize: '0.8rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                color: 'var(--text-main)',
+                                                border: '1px solid var(--glass-border)'
+                                            }}>
+                                                <PenTool size={14} /> {f.name}
+                                                <button
+                                                    onClick={() => setData(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== idx) }))}
+                                                    style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', padding: '0 4px', fontSize: '1.2rem', lineHeight: 1 }}
+                                                >
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="grid-responsive-2" style={{ gap: '15px' }}>
                                 <div className="form-group">
                                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Prazo Desejado</label>
@@ -277,8 +428,16 @@ const NewProjectPage: React.FC = () => {
                     {currentStep < STEPS.length - 1 ? (
                         <button
                             onClick={handleNext}
+                            disabled={currentStep === 2 && !data.ryverLink.trim() && data.files.length === 0}
                             className="btn-primary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '12px 24px',
+                                opacity: (currentStep === 2 && !data.ryverLink.trim() && data.files.length === 0) ? 0.5 : 1,
+                                cursor: (currentStep === 2 && !data.ryverLink.trim() && data.files.length === 0) ? 'not-allowed' : 'pointer'
+                            }}
                         >
                             Próximo <ArrowRight size={18} />
                         </button>

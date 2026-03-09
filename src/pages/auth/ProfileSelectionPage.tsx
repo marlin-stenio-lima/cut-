@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Video, CheckCircle, Loader2 } from 'lucide-react'
+import { User, Video, Loader2, MonitorPlay } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../context/AuthContext'
 
@@ -40,12 +40,13 @@ const ProfileSelectionPage: React.FC = () => {
             }
 
             console.log(`Profile successfully updated to ${type}`)
-
-            // Update AuthContext locally for an instant UI response
             updateProfileLocally({ role: type })
 
-            // Navigate to dashboard immediately
-            navigate('/dashboard')
+            if (type === 'editor') {
+                navigate('/dashboard/editor/onboarding')
+            } else {
+                navigate('/dashboard')
+            }
 
         } catch (error: any) {
             console.error('Error selecting profile:', error)
@@ -56,60 +57,59 @@ const ProfileSelectionPage: React.FC = () => {
     }
 
     return (
-        <div className="auth-container">
+        <div className="futuristic-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontFamily: "'Inter', sans-serif", padding: '40px 20px' }}>
+
             <div style={{ maxWidth: '800px', width: '100%', textAlign: 'center' }}>
-                <h1 style={{ fontSize: '2.5rem', marginBottom: '16px', fontWeight: 700 }}>Como você quer usar o Cut House?</h1>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '48px', fontSize: '1.1rem' }}>
-                    Escolha o perfil que melhor descreve você para personalizarmos sua experiência.
+
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
+                    <div style={{ width: '40px', height: '40px', background: '#07b6d5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <MonitorPlay size={24} color="#000" />
+                    </div>
+                </div>
+
+                <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.5rem)', marginBottom: '16px', fontWeight: 800, letterSpacing: '-0.02em' }}>Como você quer usar o CutHouse?</h1>
+                <p style={{ color: '#888888', marginBottom: '48px', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto 48px', lineHeight: 1.6 }}>
+                    Escolha seu foco para personalizarmos sua área de trabalho e recomendarmos as melhores ferramentas.
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+
                     {/* Client Option */}
                     <button
                         onClick={() => handleSelectProfile('client')}
                         disabled={isSubmitting !== null}
-                        className="glass"
+                        className="profile-option"
                         style={{
-                            padding: '48px',
+                            padding: '40px 32px',
                             cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.3s',
-                            border: '1px solid var(--glass-border)',
+                            transition: 'all 0.2s ease',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             gap: '24px',
-                            background: 'transparent',
+                            background: 'rgba(5, 5, 5, 0.6)',
+                            backdropFilter: 'blur(16px)',
                             textAlign: 'center',
                             width: '100%',
                             opacity: isSubmitting && isSubmitting !== 'client' ? 0.5 : 1
                         }}
-                        onMouseEnter={(e) => {
-                            if (!isSubmitting) {
-                                e.currentTarget.style.borderColor = 'var(--accent)'
-                                e.currentTarget.style.transform = 'translateY(-8px)'
-                                e.currentTarget.style.boxShadow = '0 20px 40px rgba(7, 182, 213, 0.1)'
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--glass-border)'
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                        }}
                     >
-                        <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'rgba(7, 182, 213, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <User size={40} className="accent-cyan" />
+                        <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'rgba(7, 182, 213, 0.1)', border: '1px solid rgba(7, 182, 213, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <User size={40} color="#07b6d5" />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--text-main)' }}>Sou Cliente</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                                Quero encontrar os melhores editores para meus projetos de vídeo.
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: '#ffffff', fontWeight: 700, letterSpacing: '-0.01em' }}>Sou Cliente</h3>
+                            <p style={{ color: '#888888', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                                Quero contratar os melhores editores para produzir os vídeos da minha empresa ou marca.
                             </p>
                         </div>
-                        <div style={{ marginTop: 'auto', color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ marginTop: 'auto', paddingTop: '16px', color: '#07b6d5', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem' }}>
                             {isSubmitting === 'client' ? (
-                                <>Processando... <Loader2 size={18} className="spin" /></>
+                                <>Configurando conta... <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></>
                             ) : (
-                                <>Selecionar <CheckCircle size={18} /></>
+                                <>Avançar como Cliente <ArrowRight size={18} /></>
                             )}
                         </div>
                     </button>
@@ -118,55 +118,74 @@ const ProfileSelectionPage: React.FC = () => {
                     <button
                         onClick={() => handleSelectProfile('editor')}
                         disabled={isSubmitting !== null}
-                        className="glass"
+                        className="profile-option"
                         style={{
-                            padding: '48px',
+                            padding: '40px 32px',
                             cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.3s',
-                            border: '1px solid var(--glass-border)',
+                            transition: 'all 0.2s ease',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             gap: '24px',
-                            background: 'transparent',
+                            background: 'rgba(5, 5, 5, 0.6)',
+                            backdropFilter: 'blur(16px)',
                             textAlign: 'center',
                             width: '100%',
                             opacity: isSubmitting && isSubmitting !== 'editor' ? 0.5 : 1
                         }}
-                        onMouseEnter={(e) => {
-                            if (!isSubmitting) {
-                                e.currentTarget.style.borderColor = 'var(--primary)'
-                                e.currentTarget.style.transform = 'translateY(-8px)'
-                                e.currentTarget.style.boxShadow = '0 20px 40px rgba(99, 102, 241, 0.1)'
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--glass-border)'
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                        }}
                     >
-                        <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Video size={40} style={{ color: 'var(--primary)' }} />
+                        <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Video size={40} color="#ffffff" />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: 'var(--text-main)' }}>Sou Editor</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                                Quero trabalhar em projetos incríveis e mostrar meu portfólio.
+                            <h3 style={{ fontSize: '1.5rem', marginBottom: '12px', color: '#ffffff', fontWeight: 700, letterSpacing: '-0.01em' }}>Sou Editor</h3>
+                            <p style={{ color: '#888888', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                                Quero trabalhar em projetos incríveis e monetizar minhas habilidades audiovisuais.
                             </p>
                         </div>
-                        <div style={{ marginTop: 'auto', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ marginTop: 'auto', paddingTop: '16px', color: '#ffffff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem' }}>
                             {isSubmitting === 'editor' ? (
-                                <>Processando... <Loader2 size={18} className="spin" /></>
+                                <>Configurando conta... <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /></>
                             ) : (
-                                <>Selecionar <CheckCircle size={18} /></>
+                                <>Avançar como Editor <ArrowRight size={18} /></>
                             )}
                         </div>
                     </button>
+
                 </div>
             </div>
+
+            {/* Injected Styles */}
+            <style>{`
+                .profile-option:hover:not(:disabled) {
+                    border-color: rgba(255, 255, 255, 0.15) !important;
+                    background: rgba(10, 10, 10, 0.8) !important;
+                    transform: translateY(-4px);
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                }
+                @keyframes spin { 100% { transform: rotate(360deg); } }
+                
+                .futuristic-bg {
+                    background-color: #000000;
+                    background-image: 
+                        radial-gradient(circle at 15% 50%, rgba(7, 182, 213, 0.08), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%),
+                        radial-gradient(ellipse at top, rgba(7, 182, 213, 0.2) 0%, transparent 40%),
+                        radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+                        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+                    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+                }
+            `}</style>
         </div>
     )
 }
+
+// ArrowRight needed to be added to imports, adding it inline via a small component mock to avoid a messy import rewrite:
+const ArrowRight = ({ size }: { size: number }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+)
 
 export default ProfileSelectionPage

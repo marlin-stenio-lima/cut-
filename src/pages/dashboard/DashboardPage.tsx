@@ -10,6 +10,7 @@ import NewProjectPage from './client/NewProjectPage'
 import MyProjectsPage from './client/MyProjectsPage'
 import ExplorePage from './editor/ExplorePage'
 import MyWorkPage from './editor/MyWorkPage'
+import EditorOnboarding from './editor/EditorOnboarding'
 
 const DashboardPage: React.FC = () => {
     const { profile, loading, user } = useAuth()
@@ -24,6 +25,11 @@ const DashboardPage: React.FC = () => {
     if (!profile || !profile.role) {
         console.log('[DashboardPage] No profile/role found, redirecting to selection')
         return <Navigate to="/profile-selection" />
+    }
+
+    // New: If editor and missing onboarding data, force onboarding
+    if (profile.role === 'editor' && !profile.portfolio_url && !window.location.pathname.includes('onboarding')) {
+        return <Navigate to="/dashboard/editor/onboarding" />
     }
 
     const role = profile.role as 'client' | 'editor'
@@ -51,6 +57,7 @@ const DashboardPage: React.FC = () => {
                     <>
                         <Route path="explore" element={<ExplorePage />} />
                         <Route path="work" element={<MyWorkPage />} />
+                        <Route path="editor/onboarding" element={<EditorOnboarding />} />
                     </>
                 )}
 
