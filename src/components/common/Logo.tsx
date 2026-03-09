@@ -1,5 +1,3 @@
-import React from 'react';
-import { MonitorPlay } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface LogoProps {
@@ -29,14 +27,14 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
             <div style={{
                 width: boxSize,
                 height: boxSize,
-                background: '#07b6d5',
                 borderRadius: size === 'sm' ? '4px' : '6px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0
+                flexShrink: 0,
+                overflow: 'hidden'
             }}>
-                <MonitorPlay size={iconSize} color="#000" />
+                <img src="/logo.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             {showText && (
                 <span style={{
