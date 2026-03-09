@@ -1,13 +1,15 @@
+import { Mail, Lock, User, UserPlus, Eye, EyeOff, Phone } from 'lucide-react'
+import Logo from '../../components/common/Logo'
+import { supabase } from '../../services/supabase'
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, UserPlus, Eye, EyeOff, MonitorPlay } from 'lucide-react'
-import { supabase } from '../../services/supabase'
 
 const RegisterPage: React.FC = () => {
     const [fullName, setFullName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [phone, setPhone] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
@@ -38,6 +40,7 @@ const RegisterPage: React.FC = () => {
                 options: {
                     data: {
                         full_name: fullName,
+                        phone: phone,
                     }
                 }
             })
@@ -67,12 +70,9 @@ const RegisterPage: React.FC = () => {
             <div style={{ width: '100%', maxWidth: '440px', padding: '48px', background: 'rgba(5, 5, 5, 0.6)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
 
                 <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#ffffff', marginBottom: '32px', transition: 'opacity 0.2s' }} className="hover-opacity">
-                        <div style={{ width: '32px', height: '32px', background: '#07b6d5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <MonitorPlay size={18} color="#000" />
-                        </div>
-                        <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>CutHouse</span>
-                    </Link>
+                    <div style={{ marginBottom: '32px' }}>
+                        <Logo />
+                    </div>
                     <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '12px', letterSpacing: '-0.02em' }}>Criar sua conta</h1>
                     <p style={{ color: '#888888', fontSize: '0.95rem', lineHeight: 1.5 }}>Junte-se à maior plataforma premium para projetos de vídeo.</p>
                 </div>
@@ -117,6 +117,26 @@ const RegisterPage: React.FC = () => {
                                 placeholder="seu@email.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
+                                required
+                                style={{
+                                    width: '100%', padding: '14px 16px 14px 44px', background: 'rgba(10, 10, 10, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '8px', color: '#fff', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s'
+                                }}
+                                className="input-focus"
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#a0a0a0' }}>WhatsApp / Telefone</label>
+                        <div style={{ position: 'relative' }}>
+                            <Phone size={18} color="#666" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                            <input
+                                type="tel"
+                                name="phone"
+                                placeholder="(00) 00000-0000"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
                                 required
                                 style={{
                                     width: '100%', padding: '14px 16px 14px 44px', background: 'rgba(10, 10, 10, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -215,12 +235,12 @@ const RegisterPage: React.FC = () => {
                 .futuristic-bg {
                     background-color: #000000;
                     background-image: 
-                        radial-gradient(circle at 15% 50%, rgba(7, 182, 213, 0.08), transparent 25%),
-                        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%),
-                        radial-gradient(ellipse at top, rgba(7, 182, 213, 0.2) 0%, transparent 40%),
-                        radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
-                        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+                    radial-gradient(circle at 15% 50%, rgba(7, 182, 213, 0.08), transparent 25%),
+                    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%),
+                    radial-gradient(ellipse at top, rgba(7, 182, 213, 0.2) 0%, transparent 40%),
+                    radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+                    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
                     background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
                 }
             `}</style>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import Logo from '../common/Logo'
 import {
     LayoutDashboard,
     Video,
@@ -48,11 +49,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
         <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-deep)', color: 'var(--text-main)', flexDirection: 'column' }}>
             {/* Mobile Header */}
             <header className="mobile-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.2rem', fontWeight: 700 }}>
-                    <img src="/logo.jpg" alt="Cut House" style={{ width: '28px', height: '28px', borderRadius: '8px' }} />
-                    <span>Cut House</span>
-                </div>
+                <Logo size="sm" />
                 <button
+                    className="mobile-menu-btn"
                     onClick={() => setIsMobileMenuOpen(true)}
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '4px' }}
                 >
@@ -83,10 +82,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                     left: 0
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px', padding: '0 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.4rem', fontWeight: 700 }}>
-                            <img src="/logo.jpg" alt="Cut House" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
-                            <span>Cut House</span>
-                        </div>
+                        <Logo />
                         {/* Close button only visible on mobile (handled by css implicitly because sidebar slides away but visually nice to have) */}
                         <button
                             className="close-menu-btn"

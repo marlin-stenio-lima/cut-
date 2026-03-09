@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { PenTool, BookOpen, Clock, Check, Loader2 } from 'lucide-react';
+import Logo from '../../../components/common/Logo';
 
 const EditorOnboarding: React.FC = () => {
     const navigate = useNavigate();
@@ -46,7 +47,10 @@ const EditorOnboarding: React.FC = () => {
     };
 
     return (
-        <div style={{ maxWidth: '600px', margin: '40px auto', padding: '0 20px' }}>
+        <div style={{ maxWidth: '600px', margin: '20px auto', padding: '0 20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <Logo />
+            </div>
             <div className="glass" style={{ padding: '40px', borderRadius: '24px' }}>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <div style={{

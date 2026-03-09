@@ -1,7 +1,8 @@
+import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react'
+import Logo from '../../components/common/Logo'
+import { supabase } from '../../services/supabase'
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, MonitorPlay, LogIn } from 'lucide-react'
-import { supabase } from '../../services/supabase'
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('')
@@ -16,49 +17,29 @@ const LoginPage: React.FC = () => {
         setLoading(true)
         setError(null)
 
-        const timeout = setTimeout(() => {
-            setLoading(false)
-            setError('A requisição de login falhou ou demorou demais. Tente novamente.')
-        }, 10000)
-
         try {
-            console.log('[LoginPage] Attempting login for:', email)
-            const { data, error: authError } = await supabase.auth.signInWithPassword({
+            const { error: loginError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             })
 
-            if (authError) throw authError
-
-            if (data.user) {
-                console.log('[LoginPage] Auth success! Waiting for AuthContext to redirect...')
-                setTimeout(() => {
-                    navigate('/dashboard')
-                }, 500)
-            }
-        } catch (error: any) {
-            console.error('[LoginPage] Login error:', error.message)
-            setError(error.message === 'Invalid login credentials'
-                ? 'E-mail ou senha incorretos.'
-                : 'Erro ao entrar: ' + error.message)
+            if (loginError) throw loginError
+            navigate('/dashboard')
+        } catch (err: any) {
+            setError('E-mail ou senha incorretos.')
             setLoading(false)
-        } finally {
-            clearTimeout(timeout)
         }
     }
 
     return (
-        <div className="futuristic-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontFamily: "'Inter', sans-serif" }}>
+        <div className="futuristic-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontFamily: "'Inter', sans-serif", padding: '20px' }}>
 
             <div style={{ width: '100%', maxWidth: '440px', padding: '48px', background: 'rgba(5, 5, 5, 0.6)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
 
                 <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#ffffff', marginBottom: '32px', transition: 'opacity 0.2s' }} className="hover-opacity">
-                        <div style={{ width: '32px', height: '32px', background: '#07b6d5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <MonitorPlay size={18} color="#000" />
-                        </div>
-                        <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>CutHouse</span>
-                    </Link>
+                    <div style={{ marginBottom: '32px' }}>
+                        <Logo />
+                    </div>
                     <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '12px', letterSpacing: '-0.02em' }}>Bem-vindo de volta</h1>
                     <p style={{ color: '#888888', fontSize: '0.95rem', lineHeight: 1.5 }}>Faça login na sua conta para gerenciar seus projetos.</p>
                 </div>
@@ -77,8 +58,6 @@ const LoginPage: React.FC = () => {
                             <Mail size={18} color="#666" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                             <input
                                 type="email"
-                                name="email"
-                                autoComplete="email"
                                 placeholder="seu@email.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -95,14 +74,12 @@ const LoginPage: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#a0a0a0' }}>Senha</label>
-                            <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: '#07b6d5', textDecoration: 'none', fontWeight: 500 }}>Esqueceu a senha?</Link>
+                            <a href="#" style={{ fontSize: '0.8rem', color: '#07b6d5', textDecoration: 'none' }} className="hover-underline">Esqueceu a senha?</a>
                         </div>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} color="#666" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                             <input
                                 type={showPassword ? "text" : "password"}
-                                name="password"
-                                autoComplete="current-password"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -130,14 +107,14 @@ const LoginPage: React.FC = () => {
                         fontSize: '1rem', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', gap: '8px', transition: 'opacity 0.2s', opacity: loading ? 0.7 : 1
                     }} className="btn-hover-opacity">
-                        {loading ? 'Entrando...' : <><LogIn size={18} /> Entrar na plataforma</>}
+                        {loading ? 'Entrando...' : <><LogIn size={18} /> Entrar</>}
                     </button>
 
                 </form>
 
                 <div style={{ marginTop: '32px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '24px' }}>
                     <p style={{ color: '#888', fontSize: '0.9rem' }}>
-                        Não tem uma conta? <Link to="/register" style={{ color: '#ffffff', fontWeight: 600, textDecoration: 'none' }} className="hover-underline">Criar agora</Link>
+                        Não tem uma conta? <Link to="/register" style={{ color: '#ffffff', fontWeight: 600, textDecoration: 'none' }} className="hover-underline">Criar conta grátis</Link>
                     </p>
                 </div>
 
@@ -145,14 +122,13 @@ const LoginPage: React.FC = () => {
 
             <style>{`
                 .input-focus:focus { border-color: #07b6d5 !important; }
-                .hover-opacity:hover { opacity: 0.8; }
+                .hover-underline:hover { text-decoration: underline !important; }
                 .hover-text-white:hover { color: #ffffff !important; }
                 .btn-hover-opacity:hover:not(:disabled) { opacity: 0.9; }
-                .hover-underline:hover { text-decoration: underline !important; }
-
+                
                 .futuristic-bg {
                     background-color: #000000;
-                    background-image:
+                    background-image: 
                         radial-gradient(circle at 15% 50%, rgba(7, 182, 213, 0.08), transparent 25%),
                         radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%),
                         radial-gradient(ellipse at top, rgba(7, 182, 213, 0.2) 0%, transparent 40%),

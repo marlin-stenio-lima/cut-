@@ -1,6 +1,6 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, ShieldCheck, Users, MonitorPlay, MessageSquare } from 'lucide-react'
+import { ArrowRight, Check, ShieldCheck, Users, MessageSquare } from 'lucide-react'
+import Logo from '../components/common/Logo'
 
 // Array of fake trusted companies
 const TRUSTED_BY = ['Nexus', 'Vanguard', 'OmniTech', 'Stratos', 'Quantum', 'Horizon']
@@ -24,14 +24,9 @@ const LandingPage: React.FC = () => {
                 backdropFilter: 'blur(12px)',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', background: '#07b6d5', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <MonitorPlay size={20} color="#000" />
-                    </div>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em' }}>CutHouse</span>
-                </div>
+                <Logo />
 
-                <nav style={{ display: 'none', gap: '32px', '@media (min-width: 768px)': { display: 'flex' } } as any}>
+                <nav className="desktop-nav" style={{ gap: '32px' }}>
                     <a href="#como-funciona" style={{ color: '#a0a0a0', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.2s' }} className="nav-link">Como funciona</a>
                     <a href="#produtores" style={{ color: '#a0a0a0', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.2s' }} className="nav-link">Para editores</a>
                     <a href="#empresas" style={{ color: '#a0a0a0', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.2s' }} className="nav-link">Para empresas</a>
@@ -273,12 +268,7 @@ const LandingPage: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '40px' }}>
 
                         <div style={{ maxWidth: '300px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <div style={{ width: '24px', height: '24px', background: '#333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <MonitorPlay size={14} color="#fff" />
-                                </div>
-                                <span style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>CutHouse</span>
-                            </div>
+                            <Logo size="sm" />
                             <p style={{ color: '#666666', fontSize: '0.9rem', lineHeight: 1.6 }}>
                                 A plataforma que conecta você a editores profissionais, garantindo segurança e fluidez do briefing à entrega.
                             </p>
@@ -316,7 +306,13 @@ const LandingPage: React.FC = () => {
                 .btn-hover-scale:hover { transform: scale(1.02); }
                 .btn-hover-solid:hover { background: #06a4c0 !important; }
                 .btn-hover-outline:hover { background: #1a1a1a !important; border-color: #444 !important; }
+                .logo-container:hover { opacity: 0.8; }
                 ::selection { background: rgba(7, 182, 213, 0.3); color: white; }
+                
+                .desktop-nav { display: none; }
+                @media (min-width: 768px) {
+                    .desktop-nav { display: flex; }
+                }
                 
                 .futuristic-bg {
                     background-color: #000000;
