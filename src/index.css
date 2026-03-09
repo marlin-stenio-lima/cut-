@@ -12,6 +12,12 @@
   --accent: #07b6d5;
   /* Cyan Stitch */
 
+  /* Component Specific */
+  --tag-bg: rgba(255, 255, 255, 0.05);
+  --tag-text: rgba(255, 255, 255, 0.8);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+
   /* Texto */
   --text-main: #F8FAFC;
   --text-muted: #94A3B8;
@@ -31,6 +37,10 @@ body.light-theme {
   --text-muted: #64748b;
   --glass-border: rgba(0, 0, 0, 0.08);
   --glass-blur: blur(20px);
+  --tag-bg: rgba(0, 0, 0, 0.05);
+  --tag-text: #0f172a;
+  --input-bg: #ffffff;
+  --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
 * {

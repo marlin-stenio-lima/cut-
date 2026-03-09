@@ -189,9 +189,9 @@ const ExplorePage: React.FC = () => {
                                 width: '100%',
                                 padding: '14px 16px 14px 48px',
                                 borderRadius: '16px',
-                                background: 'var(--bg-card)',
+                                background: 'var(--input-bg)',
                                 border: '1px solid var(--glass-border)',
-                                color: 'white',
+                                color: 'var(--text-main)',
                                 outline: 'none',
                                 transition: 'all 0.2s',
                                 fontSize: '0.95rem'
@@ -204,7 +204,7 @@ const ExplorePage: React.FC = () => {
                         className="glow-btn"
                         style={{
                             background: showFilters ? 'var(--primary)' : 'var(--bg-card)',
-                            color: 'white',
+                            color: showFilters ? 'white' : 'var(--text-main)',
                             border: '1px solid var(--glass-border)',
                             padding: '14px 20px',
                             borderRadius: '16px',
@@ -217,7 +217,11 @@ const ExplorePage: React.FC = () => {
                         {showFilters ? <X size={18} /> : <Filter size={18} />}
                         {showFilters ? 'Fechar' : 'Filtros'}
                         {(selectedTypes.size + selectedFormats.size) > 0 && (
-                            <span style={{ background: 'white', color: 'var(--primary)', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{
+                                background: showFilters ? 'white' : 'var(--primary)',
+                                color: showFilters ? 'var(--primary)' : 'white',
+                                width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
                                 {selectedTypes.size + selectedFormats.size}
                             </span>
                         )}
@@ -240,8 +244,8 @@ const ExplorePage: React.FC = () => {
                                             padding: '8px 16px',
                                             borderRadius: '12px',
                                             fontSize: '0.85rem',
-                                            background: selectedTypes.has(type) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                                            color: selectedTypes.has(type) ? 'black' : 'var(--text-muted)',
+                                            background: selectedTypes.has(type) ? 'var(--accent)' : 'var(--tag-bg)',
+                                            color: selectedTypes.has(type) ? 'black' : 'var(--text-main)',
                                             border: 'none',
                                             cursor: 'pointer',
                                             fontWeight: 600,
@@ -265,8 +269,8 @@ const ExplorePage: React.FC = () => {
                                             padding: '8px 16px',
                                             borderRadius: '12px',
                                             fontSize: '0.85rem',
-                                            background: selectedFormats.has(format) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                                            color: selectedFormats.has(format) ? 'black' : 'var(--text-muted)',
+                                            background: selectedFormats.has(format) ? 'var(--accent)' : 'var(--tag-bg)',
+                                            color: selectedFormats.has(format) ? 'black' : 'var(--text-main)',
                                             border: 'none',
                                             cursor: 'pointer',
                                             fontWeight: 600,
@@ -385,9 +389,9 @@ const ExplorePage: React.FC = () => {
                                             borderRadius: '10px',
                                             fontSize: '0.75rem',
                                             fontWeight: 600,
-                                            background: 'rgba(255,255,255,0.05)',
-                                            color: 'rgba(255,255,255,0.8)',
-                                            border: '1px solid rgba(255,255,255,0.05)'
+                                            background: 'var(--tag-bg)',
+                                            color: 'var(--tag-text)',
+                                            border: '1px solid var(--glass-border)'
                                         }}> {tag} </span>
                                     ))}
                                 </div>
