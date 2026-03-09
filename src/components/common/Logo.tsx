@@ -8,7 +8,6 @@ interface LogoProps {
 }
 
 const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '' }) => {
-    const iconSize = size === 'sm' ? 14 : size === 'md' ? 20 : 32;
     const boxSize = size === 'sm' ? '24px' : size === 'md' ? '32px' : '48px';
     const fontSize = size === 'sm' ? '1rem' : size === 'md' ? '1.25rem' : '2rem';
 
