@@ -128,32 +128,56 @@ const ExplorePage: React.FC = () => {
     }
 
     return (
-        <div style={{ paddingBottom: '40px' }}>
-            <div className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+        <div style={{ paddingBottom: '40px', maxWidth: '1400px', margin: '0 auto' }}>
+            <div className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px', gap: '24px' }}>
                 <div>
-                    <h2 style={{ fontSize: '1.8rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <Video size={28} className="accent-cyan" /> Explorar Projetos
-                    </h2>
-                    <p style={{ color: 'var(--text-muted)' }}>Encontre os projetos perfeitos para o seu estilo de edição.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ padding: '10px', background: 'rgba(7, 182, 213, 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Video size={24} className="accent-cyan" />
+                        </div>
+                        <h2 style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                            Explorar Projetos
+                        </h2>
+                        {projects.length > 0 && (
+                            <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'var(--primary)', color: 'white', fontSize: '0.75rem', fontWeight: 700 }}>
+                                {projects.length} {projects.length === 1 ? 'disponível' : 'disponíveis'}
+                            </span>
+                        )}
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem' }}>Encontre e candidate-se aos melhores projetos da nossa rede.</p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{ position: 'relative' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', minWidth: '240px' }}>
+                        <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input
                             type="text"
-                            placeholder="Buscar projetos..."
+                            placeholder="Pesquisar por título ou estilo..."
                             style={{
-                                padding: '10px 16px 10px 40px',
-                                borderRadius: '12px',
-                                background: 'rgba(255,255,255,0.05)',
-                                border: '1px solid rgba(255,255,255,0.1)',
+                                width: '100%',
+                                padding: '14px 16px 14px 48px',
+                                borderRadius: '16px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--glass-border)',
                                 color: 'white',
-                                outline: 'none'
+                                outline: 'none',
+                                transition: 'all 0.2s',
+                                fontSize: '0.95rem'
                             }}
+                            className="focus-glow"
                         />
                     </div>
-                    <button className="glow-btn" style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button className="glow-btn" style={{
+                        background: 'var(--bg-card)',
+                        color: 'white',
+                        border: '1px solid var(--glass-border)',
+                        padding: '14px 20px',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontWeight: 600
+                    }}>
                         <Filter size={18} /> Filtros
                     </button>
                 </div>
@@ -168,94 +192,154 @@ const ExplorePage: React.FC = () => {
                     </p>
                 </div>
             ) : (
-                <div className="grid-responsive-2" style={{ gap: '24px' }}>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+                    gap: '24px'
+                }}>
                     {projects.map((project) => {
                         const hasApplied = appliedProjectIds.has(project.id);
 
                         return (
                             <div key={project.id} className="glass" style={{
-                                padding: '24px',
+                                padding: '32px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '16px',
-                                borderRadius: '16px',
-                                transition: 'all 0.2s',
-                            }}>
-                                <div>
-                                    <h3 style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '8px' }}>{project.title}</h3>
-                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                        {project.description}
-                                    </p>
-                                </div>
-
-                                <div className="flex-responsive-row" style={{ alignItems: 'flex-start', gap: '16px', padding: '16px 0', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '4px' }}>Orçamento</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent)' }}>
-                                            {project.budget ? `R$ ${project.budget}` : 'A Combinar'}
-                                        </div>
+                                gap: '20px',
+                                borderRadius: '24px',
+                                transition: 'all 0.3s ease',
+                                position: 'relative',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                border: '1px solid var(--glass-border)'
+                            }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-5px)';
+                                    e.currentTarget.style.borderColor = 'rgba(7, 182, 213, 0.3)';
+                                    e.currentTarget.style.background = 'rgba(7, 182, 213, 0.02)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.borderColor = 'var(--glass-border)';
+                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                                }}>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                                    <div style={{
+                                        width: '48px', height: '48px',
+                                        borderRadius: '14px',
+                                        background: 'linear-gradient(135deg, rgba(7, 182, 213, 0.2), rgba(99, 102, 241, 0.2))',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <Play size={20} color="var(--accent)" fill="var(--accent)" />
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '4px' }}>Prazo</div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fbbf24' }}>
-                                            {project.deadline ? new Date(project.deadline).toLocaleDateString('pt-BR') : 'A Combinar'}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '4px' }}>
+                                            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>{project.title}</h3>
+                                            {hasApplied && (
+                                                <div style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(34, 197, 94, 0.14)', color: '#22c55e', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase' }}>Candidatado</div>
+                                            )}
+                                        </div>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                            {project.description}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(7, 182, 213, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <FileText size={16} color="var(--accent)" />
+                                        </div>
+                                        <div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Orçamento</div>
+                                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)' }}>
+                                                {project.budget ? `R$ ${project.budget}` : 'Combinar'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(251, 191, 36, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Play size={16} color="#fbbf24" fill="#fbbf24" />
+                                        </div>
+                                        <div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prazo</div>
+                                            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fbbf24' }}>
+                                                {project.deadline ? new Date(project.deadline).toLocaleDateString('pt-BR') : 'Combinar'}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    <span style={{ padding: '6px 12px', borderRadius: '100px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)' }}> {project.video_type} </span>
-                                    <span style={{ padding: '6px 12px', borderRadius: '100px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)' }}> {project.format} </span>
-                                    <span style={{ padding: '6px 12px', borderRadius: '100px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)' }}> {project.style} </span>
+                                    {[project.video_type, project.format, project.style].filter(Boolean).map((tag, i) => (
+                                        <span key={i} style={{
+                                            padding: '6px 14px',
+                                            borderRadius: '10px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            background: 'rgba(255,255,255,0.05)',
+                                            color: 'rgba(255,255,255,0.8)',
+                                            border: '1px solid rgba(255,255,255,0.05)'
+                                        }}> {tag} </span>
+                                    ))}
                                 </div>
 
-                                {/* Project Resources Preview */}
+                                {/* Project Resources Section */}
                                 {(project.ryver_link || (project.project_files && project.project_files.length > 0)) && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '12px',
+                                        padding: '16px',
+                                        background: 'rgba(7, 182, 213, 0.03)',
+                                        borderRadius: '16px',
+                                        border: '1px dotted rgba(7, 182, 213, 0.2)'
+                                    }}>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recursos Disponíveis</div>
+
                                         {project.ryver_link && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <ExternalLink size={14} color="var(--accent)" />
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>RYVER:</span>
-                                                <a href={project.ryver_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {project.ryver_link}
+                                                <a href={project.ryver_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                                                    Link do Ryver / Drive
                                                 </a>
                                             </div>
                                         )}
                                         {project.project_files && project.project_files.length > 0 && (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                                 {project.project_files.map((file: any, idx: number) => {
                                                     const isVideo = file.name.match(/\.(mp4|webm|ogg|mov)$/i);
                                                     return (
                                                         <div key={idx} style={{
-                                                            padding: '6px 10px',
-                                                            background: 'rgba(7, 182, 213, 0.05)',
-                                                            borderRadius: '8px',
+                                                            padding: '8px 12px',
+                                                            background: 'rgba(255, 255, 255, 0.03)',
+                                                            borderRadius: '10px',
                                                             fontSize: '0.75rem',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: '8px',
                                                             color: 'var(--text-main)',
-                                                            border: '1px solid rgba(7, 182, 213, 0.1)'
+                                                            border: '1px solid rgba(255, 255, 255, 0.05)'
                                                         }}>
-                                                            <FileText size={12} color="var(--accent)" />
-                                                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{file.name}</div>
-                                                            {isVideo && (
+                                                            <FileText size={14} color="var(--text-muted)" />
+                                                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{file.name}</div>
+                                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                                {isVideo && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}
+                                                                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                                                                    >
+                                                                        <Play size={14} fill="var(--accent)" />
+                                                                    </button>
+                                                                )}
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}
-                                                                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-                                                                    title="Assistir"
+                                                                    onClick={(e) => { e.stopPropagation(); handleDownload(file.url, file.name); }}
+                                                                    disabled={downloadingFile === file.name}
+                                                                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
                                                                 >
-                                                                    <Play size={12} fill="var(--accent)" />
+                                                                    {downloadingFile === file.name ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
                                                                 </button>
-                                                            )}
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDownload(file.url, file.name); }}
-                                                                disabled={downloadingFile === file.name}
-                                                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-                                                                title="Baixar"
-                                                            >
-                                                                {downloadingFile === file.name ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
-                                                            </button>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
@@ -264,23 +348,30 @@ const ExplorePage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {hasApplied ? (
-                                    <button
-                                        className="btn-primary"
-                                        style={{ width: '100%', marginTop: 'auto', background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'default' }}
-                                        disabled
-                                    >
-                                        Proposta Enviada
-                                    </button>
-                                ) : (
-                                    <button
-                                        className="btn-primary"
-                                        style={{ width: '100%', marginTop: 'auto', outline: 'none' }}
-                                        onClick={() => openProposalModal(project)}
-                                    >
-                                        Enviar Proposta
-                                    </button>
-                                )}
+                                <button
+                                    className={hasApplied ? "" : "btn-primary"}
+                                    style={{
+                                        width: '100%',
+                                        marginTop: '12px',
+                                        padding: '16px',
+                                        borderRadius: '16px',
+                                        fontSize: '1rem',
+                                        fontWeight: 700,
+                                        transition: 'all 0.2s',
+                                        cursor: hasApplied ? 'default' : 'pointer',
+                                        background: hasApplied ? 'rgba(255,255,255,0.05)' : 'var(--primary)',
+                                        color: hasApplied ? 'var(--text-muted)' : 'white',
+                                        border: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '10px'
+                                    }}
+                                    disabled={hasApplied}
+                                    onClick={() => !hasApplied && openProposalModal(project)}
+                                >
+                                    {hasApplied ? 'Proposta Enviada' : <><Send size={20} /> Enviar Proposta</>}
+                                </button>
                             </div>
                         );
                     })}
