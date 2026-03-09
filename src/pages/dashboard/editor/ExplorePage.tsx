@@ -17,6 +17,12 @@ const ExplorePage: React.FC = () => {
     const [previewFile, setPreviewFile] = useState<any | null>(null);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
 
+    // Filter and Search State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+    const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
+
     const handleDownload = async (url: string, fileName: string) => {
         try {
             setDownloadingFile(fileName);
@@ -119,6 +125,30 @@ const ExplorePage: React.FC = () => {
         }
     };
 
+    const filteredProjects = projects.filter(project => {
+        const matchesSearch =
+            project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        const matchesType = selectedTypes.size === 0 || selectedTypes.has(project.video_type);
+        const matchesFormat = selectedFormats.size === 0 || selectedFormats.has(project.format);
+
+        return matchesSearch && matchesType && matchesFormat;
+    });
+
+    const toggleFilter = (set: Set<string>, val: string, setter: (s: Set<string>) => void) => {
+        const newSet = new Set(set);
+        if (newSet.has(val)) {
+            newSet.delete(val);
+        } else {
+            newSet.add(val);
+        }
+        setter(newSet);
+    };
+
+    const uniqueTypes = Array.from(new Set(projects.map(p => p.video_type).filter(Boolean)));
+    const uniqueFormats = Array.from(new Set(projects.map(p => p.format).filter(Boolean)));
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -128,7 +158,7 @@ const ExplorePage: React.FC = () => {
     }
 
     return (
-        <div style={{ paddingBottom: '40px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ paddingBottom: '40px', paddingTop: '32px', maxWidth: '1400px', margin: '0 auto' }}>
             <div className="flex-responsive-row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px', gap: '24px' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -138,9 +168,9 @@ const ExplorePage: React.FC = () => {
                         <h2 style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                             Explorar Projetos
                         </h2>
-                        {projects.length > 0 && (
+                        {filteredProjects.length > 0 && (
                             <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'var(--primary)', color: 'white', fontSize: '0.75rem', fontWeight: 700 }}>
-                                {projects.length} {projects.length === 1 ? 'disponível' : 'disponíveis'}
+                                {filteredProjects.length} {filteredProjects.length === 1 ? 'disponível' : 'disponíveis'}
                             </span>
                         )}
                     </div>
@@ -152,7 +182,9 @@ const ExplorePage: React.FC = () => {
                         <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input
                             type="text"
-                            placeholder="Pesquisar por título ou estilo..."
+                            placeholder="Buscar por título ou descrição..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
                                 padding: '14px 16px 14px 48px',
@@ -167,23 +199,99 @@ const ExplorePage: React.FC = () => {
                             className="focus-glow"
                         />
                     </div>
-                    <button className="glow-btn" style={{
-                        background: 'var(--bg-card)',
-                        color: 'white',
-                        border: '1px solid var(--glass-border)',
-                        padding: '14px 20px',
-                        borderRadius: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontWeight: 600
-                    }}>
-                        <Filter size={18} /> Filtros
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="glow-btn"
+                        style={{
+                            background: showFilters ? 'var(--primary)' : 'var(--bg-card)',
+                            color: 'white',
+                            border: '1px solid var(--glass-border)',
+                            padding: '14px 20px',
+                            borderRadius: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: 600
+                        }}
+                    >
+                        {showFilters ? <X size={18} /> : <Filter size={18} />}
+                        {showFilters ? 'Fechar' : 'Filtros'}
+                        {(selectedTypes.size + selectedFormats.size) > 0 && (
+                            <span style={{ background: 'white', color: 'var(--primary)', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {selectedTypes.size + selectedFormats.size}
+                            </span>
+                        )}
                     </button>
                 </div>
             </div>
 
-            {projects.length === 0 ? (
+            {/* Expansible Filter Bar */}
+            {showFilters && (
+                <div className="glass" style={{ padding: '24px', borderRadius: '24px', marginBottom: '32px', border: '1px solid var(--glass-border)', animation: 'slideDown 0.3s ease-out' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '32px' }}>
+                        <div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>Tipo de Vídeo</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {uniqueTypes.map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => toggleFilter(selectedTypes, type, setSelectedTypes)}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.85rem',
+                                            background: selectedTypes.has(type) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                                            color: selectedTypes.has(type) ? 'black' : 'var(--text-muted)',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>Formato</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {uniqueFormats.map(format => (
+                                    <button
+                                        key={format}
+                                        onClick={() => toggleFilter(selectedFormats, format, setSelectedFormats)}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.85rem',
+                                            background: selectedFormats.has(format) ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                                            color: selectedFormats.has(format) ? 'black' : 'var(--text-muted)',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {format}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => { setSelectedTypes(new Set()); setSelectedFormats(new Set()); setSearchTerm(''); }}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                <X size={16} /> Limpar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {filteredProjects.length === 0 ? (
                 <div className="glass" style={{ padding: '60px 20px', textAlign: 'center', borderRadius: '24px' }}>
                     <Video size={48} style={{ color: 'var(--text-muted)', margin: '0 auto 16px', opacity: 0.5 }} />
                     <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Nenhum projeto disponível</h3>
@@ -197,7 +305,7 @@ const ExplorePage: React.FC = () => {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
                     gap: '24px'
                 }}>
-                    {projects.map((project) => {
+                    {filteredProjects.map((project) => {
                         const hasApplied = appliedProjectIds.has(project.id);
 
                         return (
