@@ -1,3 +1,4 @@
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, ShieldCheck, Users, MessageSquare } from 'lucide-react'
 import Logo from '../components/common/Logo'
