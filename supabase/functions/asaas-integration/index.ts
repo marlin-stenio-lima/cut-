@@ -74,23 +74,38 @@ serve(async (req) => {
       const customerName = body.name || profile.full_name || 'Cliente Cut House'
       const customerEmail = body.email || user.email || `${userId}@cuthouse.com.br`
       
+      if (asaasCustomerId) {
+        // Verify/Update existing
+        const checkRes = await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
+          method: 'GET',
+          headers: { 'access_token': ASAAS_API_KEY }
+        })
+        
+        if (checkRes.status === 404) {
+          // Customer ID is from Sandbox or doesn't exist in production, reset it
+          asaasCustomerId = null
+        } else if (checkRes.ok) {
+          // Customer exists, update their details
+          await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
+            body: JSON.stringify({ name: customerName, email: customerEmail, cpfCnpj: body.cpf, mobilePhone: body.phone })
+          })
+        }
+      }
+      
       if (!asaasCustomerId) {
-        const res = await fetch(`${ASAAS_API_URL}/customers`, {
+        // Create new customer for the current environment
+        const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
           body: JSON.stringify({ name: customerName, email: customerEmail, cpfCnpj: body.cpf, mobilePhone: body.phone, externalReference: userId })
         })
-        const data = await res.json()
-        if (data.errors) throw new Error(`Erro Asaas (Cliente): ${data.errors[0].description}`)
-        asaasCustomerId = data.id
+        const createData = await createRes.json()
+        if (createData.errors) throw new Error(`Erro Asaas (Cliente): ${createData.errors[0].description}`)
+        
+        asaasCustomerId = createData.id
         await serviceRoleClient.from('profiles').update({ asaas_customer_id: asaasCustomerId, full_name: customerName }).eq('id', userId)
-      } else {
-         // Update existing
-         await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
-           body: JSON.stringify({ name: customerName, email: customerEmail, cpfCnpj: body.cpf, mobilePhone: body.phone })
-         })
       }
 
       // Create charge
