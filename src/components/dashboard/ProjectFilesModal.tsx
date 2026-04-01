@@ -6,7 +6,7 @@ interface ProjectFilesModalProps {
     project: {
         id: string;
         title: string;
-        project_files?: { name: string; url: string; type?: string }[] | null;
+        project_files?: { name: string; url: string; type?: string; description?: string }[] | null;
         ryver_link?: string | null;
         editor_id?: string | null;
         is_proposal?: boolean;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, Briefcase, Clock, CheckCircle, TrendingUp, Loader2, CreditCard, Wallet, X, ChevronRight, Bell, User, DollarSign, Lock, Calendar, MapPin, ShieldCheck, Globe, FileText, Phone } from 'lucide-react'
+import { Plus, Briefcase, Clock, CheckCircle, TrendingUp, Loader2, CreditCard, Wallet, X, ChevronRight, Bell, User, Lock, Calendar, MapPin, ShieldCheck, Globe, FileText, Phone } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useModal } from '../../context/ModalContext'

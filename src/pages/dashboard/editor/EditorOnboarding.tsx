@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { useModal } from '../../../context/ModalContext';
-import { PenTool, BookOpen, Clock, Check, Loader2, Link as LinkIcon } from 'lucide-react';
-import Logo from '../../../components/common/Logo';
+import { PenTool, BookOpen, Clock, Check, Loader2 } from 'lucide-react';
 
 const EditorOnboarding: React.FC = () => {
     const navigate = useNavigate();

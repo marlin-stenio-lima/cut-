@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { useModal } from '../../../context/ModalContext';
-import { Briefcase, Loader2, Video, Clock, ChevronDown, ChevronUp, User, CheckCircle, ExternalLink, FileText, Play, MessageSquare, Send, Star, Pencil, X, Upload, Trash2 } from 'lucide-react';
+import { Briefcase, Loader2, Video, Clock, ChevronDown, ChevronUp, CheckCircle, ExternalLink, FileText, Play, MessageSquare, Send, Star, Pencil, X, Upload, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import VideoModal from '../../../components/dashboard/VideoModal';
 

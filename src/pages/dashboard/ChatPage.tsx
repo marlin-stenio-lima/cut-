@@ -14,7 +14,6 @@ import {
     ChevronLeft,
     ExternalLink,
     Paperclip,
-    DollarSign,
     ArrowRightLeft,
     CheckCircle2,
     FileText
@@ -45,7 +44,7 @@ interface Message {
 
 const ChatPage: React.FC = () => {
     const { user, profile } = useAuth();
-    const { showAlert, showConfirm, showToast } = useModal();
+    const { showAlert, showConfirm } = useModal();
     const navigate = useNavigate();
     const [projects, setProjects] = useState<ProjectChat[]>([]);
     const [selectedProject, setSelectedProject] = useState<ProjectChat | null>(null);

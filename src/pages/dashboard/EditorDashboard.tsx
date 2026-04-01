@@ -150,8 +150,6 @@ const EditorDashboard: React.FC = () => {
         }
     }
 
-    const completedCount = 0
-    const moneyEarned = 0
 
     const formattedEarnings = new Intl.NumberFormat('pt-BR', {
         style: 'currency',
