@@ -26,7 +26,29 @@ serve(async (req) => {
     }
 
     const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRole)
-    const body = await req.json()
+    
+    // --- ROBUST BODY PARSING ---
+    const contentType = req.headers.get('content-type') || ''
+    let body: any
+    
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+        const formData = await req.formData()
+        const dataStr = formData.get('data')
+        if (!dataStr) throw new Error("Webhook body (urlencoded) missing 'data' field")
+        body = JSON.parse(dataStr as string)
+    } else {
+        try {
+            body = await req.json()
+        } catch (e) {
+            const text = await req.text()
+            if (text.startsWith('data=')) {
+                const params = new URLSearchParams(text)
+                body = JSON.parse(params.get('data') || '{}')
+            } else {
+                throw e
+            }
+        }
+    }
 
     // --- 1. WEBHOOK HANDLER (No Auth Required) ---
     if (body.event) {
@@ -45,7 +67,6 @@ serve(async (req) => {
                 return new Response(JSON.stringify({ received: true, error: "Missing userId" }), { status: 200 })
             }
 
-            // Sync balance logic
             const { data: existingTx } = await serviceRoleClient
                 .from('wallet_transactions')
                 .select('*')
@@ -56,7 +77,6 @@ serve(async (req) => {
                 console.log(`[Asaas Webhook] Processing payment of R$ ${amount} for user ${userId}`)
                 
                 if (!existingTx) {
-                    // Create if doesn't exist
                     await serviceRoleClient
                         .from('wallet_transactions')
                         .insert({
@@ -68,14 +88,12 @@ serve(async (req) => {
                             asaas_id: paymentId
                         })
                 } else {
-                    // Update to success
                     await serviceRoleClient
                         .from('wallet_transactions')
                         .update({ status: 'SUCCESS' })
                         .eq('asaas_id', paymentId)
                 }
 
-                // 2. Increment balance
                 const { data: profile } = await serviceRoleClient
                     .from('profiles')
                     .select('balance')
@@ -85,8 +103,6 @@ serve(async (req) => {
                 const currentBalance = Number(profile?.balance || 0)
                 const newBalance = currentBalance + amount
                 
-                console.log(`[Asaas Webhook] Updating balance: ${currentBalance} -> ${newBalance}`)
-
                 await serviceRoleClient
                     .from('profiles')
                     .update({ balance: newBalance })
@@ -106,9 +122,7 @@ serve(async (req) => {
 
     // --- 2. APP ACTIONS (Auth Required) ---
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error("Não autorizado: Cabeçalho de autenticação ausente")
-    }
+    if (!authHeader) throw new Error("Não autorizado: Cabeçalho de autenticação ausente")
 
     const { data: { user }, error: authError } = await (createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } }
@@ -119,7 +133,6 @@ serve(async (req) => {
     const userId = user.id
     console.log(`[Asaas Integration] Action: ${body.action}, User: ${userId}`)
 
-    // --- SHARED UTILS ---
     const getProfile = async (uid: string) => {
       const { data, error } = await serviceRoleClient.from('profiles').select('*').eq('id', uid).single()
       if (error || !data) throw new Error("Perfil não encontrado")
@@ -148,12 +161,10 @@ serve(async (req) => {
           body: JSON.stringify({ name: customerName, email: customerEmail, cpfCnpj: body.cpf, mobilePhone: body.phone, externalReference: userId })
         })
         const createData = await createRes.json()
-        if (createData.errors) throw new Error(`Erro Asaas (Cliente): ${createData.errors[0].description}`)
         asaasCustomerId = createData.id
         await serviceRoleClient.from('profiles').update({ asaas_customer_id: asaasCustomerId, full_name: customerName }).eq('id', userId)
       }
 
-      // Create charge
       const amount = Number(body.amount)
       const paymentPayload: any = {
         customer: asaasCustomerId,
@@ -182,7 +193,6 @@ serve(async (req) => {
       const paymentId = paymentData.id
       const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(paymentData.status)
 
-      // Proactively insert pending transaction so it shows in the UI immediately
       await serviceRoleClient
         .from('wallet_transactions')
         .insert({
