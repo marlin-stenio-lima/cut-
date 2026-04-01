@@ -28,25 +28,21 @@ serve(async (req) => {
     const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRole)
     
     // --- ROBUST BODY PARSING ---
-    const contentType = req.headers.get('content-type') || ''
+    const text = await req.text()
     let body: any
     
-    if (contentType.includes('application/x-www-form-urlencoded')) {
-        const formData = await req.formData()
-        const dataStr = formData.get('data')
-        if (!dataStr) throw new Error("Webhook body (urlencoded) missing 'data' field")
-        body = JSON.parse(dataStr as string)
-    } else {
-        try {
-            body = await req.json()
-        } catch (e) {
-            const text = await req.text()
-            if (text.startsWith('data=')) {
-                const params = new URLSearchParams(text)
-                body = JSON.parse(params.get('data') || '{}')
-            } else {
-                throw e
-            }
+    try {
+        body = JSON.parse(text)
+    } catch (e) {
+        if (text.startsWith('data=') || text.includes('&data=')) {
+            // Handle URL encoded with data parameter
+            const params = new URLSearchParams(text)
+            const dataStr = params.get('data')
+            if (!dataStr) throw new Error("Webhook body (urlencoded) missing 'data' field")
+            body = JSON.parse(dataStr)
+        } else {
+            console.error("[Asaas Integration] Parse Error:", e.message, "Text:", text.substring(0, 50))
+            throw new Error(`Falha ao processar corpo da requisição: ${e.message}`)
         }
     }
 
