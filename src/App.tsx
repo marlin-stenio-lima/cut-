@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ModalProvider } from './context/ModalContext'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ProfileSelectionPage from './pages/auth/ProfileSelectionPage'
@@ -31,19 +32,22 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/profile-selection" element={<ProfileSelectionPage />} />
-            <Route path="/dashboard/*" element={
-              <PrivateRoute>
-                <DashboardPage />
-              </PrivateRoute>
-            } />
-          </Routes>
-        </Router>
+        <ModalProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/profile-selection" element={<ProfileSelectionPage />} />
+              <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+              <Route path="/dashboard/*" element={
+                <PrivateRoute>
+                  <DashboardPage />
+                </PrivateRoute>
+              } />
+            </Routes>
+          </Router>
+        </ModalProvider>
       </AuthProvider>
     </ThemeProvider>
   )

@@ -6,8 +6,10 @@ interface VideoModalProps {
     file: {
         name: string;
         path: string;
+        url?: string;
         type?: string;
     };
+    status?: string; // Optional: To hide/show watermark
     onClose: () => void;
 }
 
@@ -17,6 +19,13 @@ const VideoModal: React.FC<VideoModalProps> = ({ file, onClose }) => {
 
     React.useEffect(() => {
         const getUrl = async () => {
+            // Priority: URL already provided > Storage Path
+            if (file.url) {
+                setVideoUrl(file.url);
+                setLoading(false);
+                return;
+            }
+
             const { data } = supabase.storage
                 .from('project-files')
                 .getPublicUrl(file.path);
@@ -29,6 +38,8 @@ const VideoModal: React.FC<VideoModalProps> = ({ file, onClose }) => {
 
         getUrl();
     }, [file]);
+
+    const isFinished = status === 'Concluído';
 
     return (
         <div style={{
@@ -76,12 +87,60 @@ const VideoModal: React.FC<VideoModalProps> = ({ file, onClose }) => {
                     {loading ? (
                         <div style={{ color: 'var(--accent)' }}>Carregando vídeo...</div>
                     ) : videoUrl ? (
-                        <video
-                            src={videoUrl}
-                            controls
-                            autoPlay
-                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        />
+                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                            <video
+                                src={videoUrl}
+                                controls
+                                controlsList={isFinished ? "" : "nodownload"}
+                                onContextMenu={(e) => !isFinished && e.preventDefault()}
+                                autoPlay
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                            
+                            {!isFinished && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    pointerEvents: 'none', // Allows clicking through to the video controls
+                                    userSelect: 'none',
+                                    zIndex: 10
+                                }}>
+                                    <div style={{
+                                        fontSize: '4rem',
+                                        fontWeight: 900,
+                                        color: 'rgba(255, 255, 255, 0.1)',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.2em',
+                                        transform: 'rotate(-30deg)',
+                                        whiteSpace: 'nowrap',
+                                        textAlign: 'center'
+                                    }}>
+                                        CUT HOUSE<br/>PREVIEW
+                                    </div>
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '20px',
+                                        right: '20px',
+                                        background: 'rgba(0,0,0,0.5)',
+                                        padding: '4px 12px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.7rem',
+                                        color: 'rgba(255,255,255,0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}>
+                                        🔒 Protegido pela Cut House
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <div style={{ color: '#ef4444' }}>Erro ao carregar vídeo.</div>
                     )}

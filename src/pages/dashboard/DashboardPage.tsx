@@ -11,6 +11,7 @@ import MyProjectsPage from './client/MyProjectsPage'
 import ExplorePage from './editor/ExplorePage'
 import MyWorkPage from './editor/MyWorkPage'
 import EditorOnboarding from './editor/EditorOnboarding'
+import AdminDashboard from './AdminDashboard'
 
 const DashboardPage: React.FC = () => {
     const { profile, loading, user } = useAuth()
@@ -18,6 +19,7 @@ const DashboardPage: React.FC = () => {
     console.log('[DashboardPage] Render:', { user: !!user, hasProfile: !!profile, role: profile?.role, loading })
 
     if (loading) {
+        console.log('[DashboardPage] Loading state active...')
         return null
     }
 
@@ -32,13 +34,17 @@ const DashboardPage: React.FC = () => {
         return <Navigate to="/dashboard/editor/onboarding" />
     }
 
-    const role = profile.role as 'client' | 'editor'
+    const role = profile.role as 'client' | 'editor' | 'admin'
 
     return (
         <DashboardLayout role={role}>
             <Routes>
                 {/* Default Dashboard Home */}
-                <Route path="/" element={role === 'client' ? <ClientDashboard /> : <EditorDashboard />} />
+                <Route path="/" element={
+                    role === 'client' ? <ClientDashboard /> : 
+                    role === 'editor' ? <EditorDashboard /> : 
+                    <AdminDashboard />
+                } />
 
                 {/* Shared Routes */}
                 <Route path="chat" element={<ChatPage />} />
@@ -59,6 +65,11 @@ const DashboardPage: React.FC = () => {
                         <Route path="work" element={<MyWorkPage />} />
                         <Route path="editor/onboarding" element={<EditorOnboarding />} />
                     </>
+                )}
+
+                {/* Admin Only Routes */}
+                {role === 'admin' && (
+                    <Route path="admin" element={<AdminDashboard />} />
                 )}
 
                 {/* Catch-all to default dashboard */}

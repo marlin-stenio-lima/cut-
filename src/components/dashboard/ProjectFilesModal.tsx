@@ -45,6 +45,25 @@ const ProjectFilesModal: React.FC<ProjectFilesModalProps> = ({ project, userRole
         }
     };
 
+    const handleUpdateDescription = async (index: number, newDesc: string) => {
+        try {
+            const currentFiles = [...(project.project_files || [])];
+            if (!currentFiles[index]) return;
+
+            currentFiles[index] = { ...currentFiles[index], description: newDesc };
+
+            const { error: updateError } = await supabase
+                .from('projects')
+                .update({ project_files: currentFiles })
+                .eq('id', project.id);
+
+            if (updateError) throw updateError;
+            onRefresh();
+        } catch (err) {
+            console.error('Error updating description:', err);
+        }
+    };
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -81,7 +100,8 @@ const ProjectFilesModal: React.FC<ProjectFilesModalProps> = ({ project, userRole
                         name: file.name,
                         url: publicUrl,
                         type: file.type,
-                        path: uploadData.path // Using path for VideoModal compatibility
+                        path: uploadData.path,
+                        description: '' // Default empty description
                     } as any);
                 }
             }
@@ -185,8 +205,34 @@ const ProjectFilesModal: React.FC<ProjectFilesModalProps> = ({ project, userRole
                                 <div key={idx} style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <FileText size={18} color="var(--accent)" />
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 500 }}>{file.name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Arquivo enviado</div>
+                                        <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 500, marginBottom: '2px' }}>{file.name}</div>
+                                        <div style={{ marginTop: '8px', position: 'relative' }}>
+                                            <textarea 
+                                                placeholder="Bloco de Notas: Adicione observações detalhadas sobre este arquivo..." 
+                                                defaultValue={file.description || ''}
+                                                onBlur={(e) => handleUpdateDescription(idx, e.target.value)}
+                                                style={{ 
+                                                    width: '100%', 
+                                                    minHeight: '80px',
+                                                    background: 'rgba(255, 255, 255, 0.02)', 
+                                                    border: '1px solid var(--glass-border)',
+                                                    borderRadius: '10px',
+                                                    color: 'var(--text-muted)', 
+                                                    fontSize: '0.8rem',
+                                                    padding: '12px',
+                                                    outline: 'none',
+                                                    transition: 'all 0.2s',
+                                                    resize: 'vertical',
+                                                    lineHeight: '1.4',
+                                                    fontFamily: 'inherit'
+                                                }}
+                                                onFocus={(e) => {
+                                                    e.target.style.borderColor = 'var(--accent)';
+                                                    e.target.style.background = 'rgba(255, 255, 255, 0.04)';
+                                                    e.target.style.color = 'var(--text-main)';
+                                                }}
+                                            />
+                                        </div>
                                     </div>
 
                                     {isVideo ? (

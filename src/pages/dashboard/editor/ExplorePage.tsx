@@ -13,6 +13,7 @@ const ExplorePage: React.FC = () => {
     // Proposal Modal State
     const [selectedProject, setSelectedProject] = useState<any | null>(null);
     const [coverLetter, setCoverLetter] = useState('');
+    const [offeredPrice, setOfferedPrice] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [previewFile, setPreviewFile] = useState<any | null>(null);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
@@ -85,6 +86,7 @@ const ExplorePage: React.FC = () => {
     const openProposalModal = (project: any) => {
         setSelectedProject(project);
         setCoverLetter('');
+        setOfferedPrice(project.budget?.toString() || '');
     };
 
     const closeProposalModal = () => {
@@ -102,7 +104,8 @@ const ExplorePage: React.FC = () => {
                 .insert({
                     project_id: selectedProject.id,
                     editor_id: user.id,
-                    cover_letter: coverLetter.trim()
+                    cover_letter: coverLetter.trim(),
+                    offered_price: offeredPrice ? Number(offeredPrice) : null
                 });
 
             if (error) {
@@ -564,24 +567,48 @@ const ExplorePage: React.FC = () => {
                                 <p style={{ color: 'var(--text-muted)' }}>Descreva seu plano para este trabalho.</p>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '300px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Apresentação</label>
-                                    <span style={{ fontSize: '0.75rem', color: coverLetter.length > 500 ? '#ef4444' : 'var(--text-muted)' }}>{coverLetter.length}/1000</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                <div>
+                                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Descrição do Projeto</h4>
+                                    <p style={{ fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: 1.6, background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                                        {selectedProject.description || 'Sem descrição detalhada.'}
+                                    </p>
                                 </div>
-                                <textarea
-                                    value={coverLetter}
-                                    onChange={(e) => setCoverLetter(e.target.value)}
-                                    placeholder="Comece com uma saudação e conte um pouco sobre sua visão para este vídeo..."
-                                    style={{
-                                        flex: 1, width: '100%', padding: '20px', borderRadius: '16px',
-                                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
-                                        color: 'white', outline: 'none', resize: 'none', fontFamily: 'inherit',
-                                        fontSize: '1rem', lineHeight: 1.6, transition: 'all 0.3s'
-                                    }}
-                                    onFocus={(e) => e.currentTarget.style.border = '1px solid var(--accent)'}
-                                    onBlur={(e) => e.currentTarget.style.border = '1px solid var(--glass-border)'}
-                                />
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sua Proposta de Valor (R$)</label>
+                                        <input 
+                                            type="number"
+                                            value={offeredPrice}
+                                            onChange={(e) => setOfferedPrice(e.target.value)}
+                                            placeholder="Ex: 250"
+                                            style={{
+                                                width: '100%', padding: '14px 16px', borderRadius: '12px',
+                                                background: 'rgba(7, 182, 213, 0.05)', border: '1px solid var(--accent)',
+                                                color: 'white', outline: 'none', fontSize: '1.2rem', fontWeight: 800
+                                            }}
+                                        />
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Sugestão baseada no budget do cliente (R$ {selectedProject.budget})</span>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Apresentação</label>
+                                            <span style={{ fontSize: '0.75rem', color: coverLetter.length > 500 ? '#ef4444' : 'var(--text-muted)' }}>{coverLetter.length}/1000</span>
+                                        </div>
+                                        <textarea
+                                            value={coverLetter}
+                                            onChange={(e) => setCoverLetter(e.target.value)}
+                                            placeholder="Conte por que você é o editor ideal..."
+                                            style={{
+                                                width: '100%', height: '120px', padding: '16px', borderRadius: '12px',
+                                                background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
+                                                color: 'white', outline: 'none', resize: 'none', fontSize: '0.95rem'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '32px' }}>

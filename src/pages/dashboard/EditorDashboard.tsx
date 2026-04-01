@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Zap, Target, Star, Loader2, Clock, X, Send } from 'lucide-react'
+import { Zap, Target, Star, Loader2, Clock, X, Send, CreditCard } from 'lucide-react'
+import { asaasService } from '../../services/asaas'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabase'
 
@@ -15,6 +16,15 @@ const EditorDashboard: React.FC = () => {
     const [selectedProject, setSelectedProject] = useState<any | null>(null)
     const [coverLetter, setCoverLetter] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+
+    // Wallet State
+    const [showWalletModal, setShowWalletModal] = useState(false)
+    const [withdrawAmount, setWithdrawAmount] = useState('')
+    const [pixKey, setPixKey] = useState('')
+    const [pixType, setPixType] = useState('CPF')
+    const [isWithdrawing, setIsWithdrawing] = useState(false)
+    const [transactions, setTransactions] = useState<any[]>([])
+    const [balance, setBalance] = useState(0)
 
     useEffect(() => {
         const loadEditorData = async () => {
@@ -51,6 +61,13 @@ const EditorDashboard: React.FC = () => {
 
                 if (aError) throw aError
                 setMyActiveProjects(activeData || [])
+
+                // 4. Fetch Wallet Data
+                const { data: profData } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
+                setBalance(Number(profData?.balance || 0))
+
+                const txs = await asaasService.getTransactions()
+                setTransactions(txs || [])
             } catch (err: any) {
                 console.error('Error loading editor dashboard:', err)
             } finally {
@@ -103,14 +120,43 @@ const EditorDashboard: React.FC = () => {
     }
 
     // Calculate metrics based on active/finished projects later when implemented, using placeholders for now
+    const handleWithdraw = async () => {
+        if (!user || !withdrawAmount || !pixKey) return
+        const amount = parseFloat(withdrawAmount)
+        if (amount > balance) {
+            alert('Saldo insuficiente!')
+            return
+        }
+
+        setIsWithdrawing(true)
+        try {
+            const res = await asaasService.requestWithdrawal(amount, pixKey, pixType)
+            if (res.success) {
+                alert(res.auto ? 'Saque realizado com sucesso! (PIX enviado)' : 'Solicitação enviada! Aguarde a aprovação do administrador.')
+                setShowWalletModal(false)
+                setWithdrawAmount('')
+                // Refresh balance and txs
+                const { data: profData } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
+                setBalance(Number(profData?.balance || 0))
+                const txs = await asaasService.getTransactions()
+                setTransactions(txs || [])
+            } else {
+                throw new Error(res.message || 'Erro ao processar saque')
+            }
+        } catch (err: any) {
+            alert(`Erro ao solicitar saque: ${err.message}`)
+        } finally {
+            setIsWithdrawing(false)
+        }
+    }
+
     const completedCount = 0
     const moneyEarned = 0
 
     const formattedEarnings = new Intl.NumberFormat('pt-BR', {
         style: 'currency',
         currency: 'BRL',
-        maximumFractionDigits: 0
-    }).format(moneyEarned)
+    }).format(balance)
 
     if (loading) {
         return (
@@ -276,11 +322,17 @@ const EditorDashboard: React.FC = () => {
                                                     borderRadius: '100px',
                                                     fontSize: '0.75rem',
                                                     fontWeight: 700,
-                                                    background: project.status === 'Em Edição' ? 'rgba(99, 102, 241, 0.1)' : project.status === 'Revisão' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                    color: project.status === 'Em Edição' ? 'var(--primary)' : project.status === 'Revisão' ? '#fbbf24' : 'var(--text-muted)'
-                                                }}>
-                                                    {project.status}
-                                                </span>
+                                                        background: project.status === 'Em Edição' ? 'rgba(99, 102, 241, 0.1)' :
+                                                                   project.status === 'Revisão' ? 'rgba(251, 191, 36, 0.1)' :
+                                                                   project.status === 'Aguardando Pagamento' ? 'rgba(34, 197, 94, 0.1)' :
+                                                                   'rgba(255, 255, 255, 0.05)',
+                                                        color: project.status === 'Em Edição' ? 'var(--primary)' :
+                                                               project.status === 'Revisão' ? '#fbbf24' :
+                                                               project.status === 'Aguardando Pagamento' ? '#4ade80' :
+                                                               'var(--text-muted)'
+                                                    }}>
+                                                        {project.status === 'Aguardando Pagamento' ? 'Entregue' : project.status}
+                                                    </span>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                                 <Clock size={16} /> {project.deadline ? new Date(project.deadline).toLocaleDateString('pt-BR') : '-'}
@@ -300,13 +352,30 @@ const EditorDashboard: React.FC = () => {
 
                     {/* Sidebar Stats */}
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid var(--glass-border)', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(255,255,255,0.02) 100%)' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <CreditCard size={18} color="var(--primary)" /> Carteira
+                            </h3>
+                            <div style={{ marginBottom: '20px' }}>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Saldo Disponível</p>
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)' }}>{formattedEarnings}</h2>
+                            </div>
+                            <button 
+                                onClick={() => setShowWalletModal(true)}
+                                className="glow-btn"
+                                style={{ width: '100%', padding: '12px', borderRadius: '100px', fontSize: '0.9rem' }}
+                                disabled={balance <= 0}
+                            >
+                                Solicitar Saque
+                            </button>
+                        </div>
+
                         <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-main)' }}>Minhas Métricas</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 {[
                                     { label: 'Avaliação Média', value: '4.9', icon: <Star size={16} fill="#FFD700" color="#FFD700" /> },
-                                    { label: 'Projetos Concluídos', value: completedCount.toString(), icon: <Target size={16} className="accent-cyan" /> },
-                                    { label: 'Ganhos no Mês', value: formattedEarnings, icon: <Zap size={16} style={{ color: 'var(--primary)' }} /> },
+                                    { label: 'Projetos Concluídos', value: myActiveProjects.filter(p => p.status === 'Concluído').length.toString(), icon: <Target size={16} className="accent-cyan" /> },
                                 ].map((m, i) => (
                                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -319,9 +388,20 @@ const EditorDashboard: React.FC = () => {
                         </div>
 
                         <div className="glass" style={{ padding: '24px', borderRadius: '20px', border: '1px solid var(--glass-border)' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-main)' }}>Últimas Mensagens</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhuma mensagem nova.</p>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--text-main)' }}>Extrato Recente</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {transactions.slice(0, 4).map((tx, idx) => (
+                                    <div key={idx} style={{ padding: '8px 0', borderBottom: idx < 3 ? '1px solid rgba(255,255,255,0.03)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{tx.type === 'TOPUP' ? 'Crédito' : 'Saque'}</div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(tx.created_at).toLocaleDateString()}</div>
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: tx.type === 'TOPUP' ? '#4ade80' : '#ef4444' }}>
+                                            {tx.type === 'TOPUP' ? '+' : '-'} R$ {tx.amount}
+                                        </div>
+                                    </div>
+                                ))}
+                                {transactions.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>Sem transações.</p>}
                             </div>
                         </div>
                     </div>
@@ -388,6 +468,89 @@ const EditorDashboard: React.FC = () => {
                     </div>
                 )}
             </div>
+
+                {/* Withdrawal Modal */}
+                {showWalletModal && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+                        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                    }}>
+                        <div className="glass" style={{
+                            maxWidth: '450px', width: '100%', borderRadius: '24px', padding: '32px',
+                            display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative',
+                            border: '1px solid var(--glass-border)',
+                            background: 'var(--bg-deep)'
+                        }}>
+                            <button
+                                onClick={() => setShowWalletModal(false)}
+                                style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            >
+                                <X size={24} />
+                            </button>
+
+                            <div>
+                                <h2 style={{ fontSize: '1.5rem', marginBottom: '8px', color: 'var(--text-main)' }}>Solicitar Saque</h2>
+                                <p style={{ color: 'var(--text-muted)' }}>O valor será enviado via PIX para sua conta.</p>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Saldo Disponível</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{formattedEarnings}</div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Valor do Saque</label>
+                                    <input 
+                                        type="number" 
+                                        value={withdrawAmount}
+                                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                                        placeholder="R$ 0,00"
+                                        min="1"
+                                        max={balance}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                    />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Tipo de Chave PIX</label>
+                                    <select 
+                                        value={pixType}
+                                        onChange={(e) => setPixType(e.target.value)}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', outline: 'none' }}
+                                    >
+                                        <option value="CPF">CPF</option>
+                                        <option value="EMAIL">E-mail</option>
+                                        <option value="PHONE">Celular</option>
+                                        <option value="RANDOM">Chave Aleatória (EVP)</option>
+                                    </select>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Sua Chave PIX</label>
+                                    <input 
+                                        type="text" 
+                                        value={pixKey}
+                                        onChange={(e) => setPixKey(e.target.value)}
+                                        placeholder="Ex: seu@email.com, CPF ou Chave Aleatória"
+                                        style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleWithdraw}
+                                disabled={isWithdrawing || !withdrawAmount || !pixKey}
+                                className="btn-primary"
+                                style={{ width: '100%', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (isWithdrawing || !withdrawAmount || !pixKey) ? 0.5 : 1 }}
+                            >
+                                {isWithdrawing ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                                Confirmar Saque
+                            </button>
+                        </div>
+                    </div>
+                )}
         </div>
     )
 }

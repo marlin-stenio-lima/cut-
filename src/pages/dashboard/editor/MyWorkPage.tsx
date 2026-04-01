@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
-import { Briefcase, Loader2, Video, Clock, MessageSquare, Play, FileText, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Briefcase, Loader2, Video, Clock, MessageSquare, Play, FileText, ExternalLink, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useModal } from '../../../context/ModalContext';
 import VideoModal from '../../../components/dashboard/VideoModal';
 
 const MyWorkPage: React.FC = () => {
     const { user } = useAuth();
+    const { showAlert, showConfirm } = useModal();
     const navigate = useNavigate();
     const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [previewFile, setPreviewFile] = useState<any | null>(null);
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+    const [isFinishing, setIsFinishing] = useState<string | null>(null);
 
     const handleDownload = async (url: string, fileName: string) => {
         try {
@@ -35,44 +38,73 @@ const MyWorkPage: React.FC = () => {
         }
     };
 
+    const loadMyWork = async () => {
+        if (!user) return;
+        setLoading(true);
+
+        try {
+            // 1. Fetch projects where I am the editor
+            const { data: assignedProjects, error: assignedError } = await supabase
+                .from('projects')
+                .select('*, client:profiles!client_id(full_name)')
+                .eq('editor_id', user.id);
+
+            if (assignedError) throw assignedError;
+
+            // 2. Fetch projects where I sent a proposal but am not yet assigned
+            const { data: myProposals, error: proposalsError } = await supabase
+                .from('proposals')
+                .select('project:projects(*, client:profiles!client_id(full_name))')
+                .eq('editor_id', user.id)
+                .eq('status', 'pending');
+
+            if (proposalsError) throw proposalsError;
+
+            const proposalProjects = myProposals?.map(p => ({ ...p.project, is_negotiation: true })) || [];
+            const allProjects = [...(assignedProjects || []), ...proposalProjects];
+
+            // Sort by creation date
+            allProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setProjects(allProjects);
+        } catch (err: any) {
+            console.error('Error loading my work:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadMyWork = async () => {
-            if (!user) return;
-
-            try {
-                // 1. Fetch projects where I am the editor
-                const { data: assignedProjects, error: assignedError } = await supabase
-                    .from('projects')
-                    .select('*, client:profiles!client_id(full_name)')
-                    .eq('editor_id', user.id);
-
-                if (assignedError) throw assignedError;
-
-                // 2. Fetch projects where I sent a proposal but am not yet assigned
-                const { data: myProposals, error: proposalsError } = await supabase
-                    .from('proposals')
-                    .select('project:projects(*, client:profiles!client_id(full_name))')
-                    .eq('editor_id', user.id)
-                    .eq('status', 'pending');
-
-                if (proposalsError) throw proposalsError;
-
-                const proposalProjects = myProposals?.map(p => ({ ...p.project, is_negotiation: true })) || [];
-                const allProjects = [...(assignedProjects || []), ...proposalProjects];
-
-                // Sort by creation date
-                allProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-                setProjects(allProjects);
-            } catch (err: any) {
-                console.error('Error loading my work:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         loadMyWork();
     }, [user]);
+
+    const handleFinishProject = async (projectId: string) => {
+        const confirmed = await showConfirm(
+            'Finalizar Entrega?',
+            'Deseja marcar este projeto como concluído e enviar para revisão do cliente?'
+        );
+        if (!confirmed) return;
+        
+        setIsFinishing(projectId);
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({
+                    status: 'Aguardando Pagamento', // Using a confirmed valid status in the DB constraint
+                    editor_finished_at: new Date().toISOString()
+                })
+                .eq('id', projectId);
+
+            if (error) throw error;
+
+            showAlert('Trabalho Entregue!', 'O projeto foi enviado para o cliente. Parabéns pela entrega!', 'success');
+            loadMyWork();
+        } catch (err: any) {
+            showAlert('Erro na Entrega', `Não foi possível finalizar: ${err.message}`, 'error');
+        } finally {
+            setIsFinishing(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -134,19 +166,32 @@ const MyWorkPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                    <button
-                                        className="btn-secondary"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate('/dashboard/chat');
-                                        }}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '10px' }}
-                                    >
-                                        <MessageSquare size={18} /> Chat
-                                    </button>
-                                    {expandedProjectId === project.id ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
-                                </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                        {project.status === 'Em Edição' && !project.is_negotiation && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleFinishProject(project.id);
+                                                }}
+                                                disabled={isFinishing === project.id}
+                                                className="btn-primary"
+                                                style={{ padding: '8px 16px', background: '#22c55e', fontSize: '0.85rem' }}
+                                            >
+                                                {isFinishing === project.id ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle size={16} /> Entregar Edição</>}
+                                            </button>
+                                        )}
+                                        <button
+                                            className="btn-secondary"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate('/dashboard/chat');
+                                            }}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '10px' }}
+                                        >
+                                            <MessageSquare size={18} /> Chat
+                                        </button>
+                                        {expandedProjectId === project.id ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
+                                    </div>
                             </div>
 
                             {expandedProjectId === project.id && (
@@ -257,6 +302,7 @@ const MyWorkPage: React.FC = () => {
             {previewFile && (
                 <VideoModal
                     file={previewFile}
+                    status={projects.find(p => p.id === expandedProjectId)?.status}
                     onClose={() => setPreviewFile(null)}
                 />
             )}

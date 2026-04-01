@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useModal } from '../../context/ModalContext';
 import VideoModal from '../../components/dashboard/VideoModal';
 import ProjectFilesModal from '../../components/dashboard/ProjectFilesModal';
 import {
@@ -11,7 +13,11 @@ import {
     Search,
     ChevronLeft,
     ExternalLink,
-    Paperclip
+    Paperclip,
+    DollarSign,
+    ArrowRightLeft,
+    CheckCircle2,
+    FileText
 } from 'lucide-react';
 
 interface ProjectChat {
@@ -39,9 +45,13 @@ interface Message {
 
 const ChatPage: React.FC = () => {
     const { user, profile } = useAuth();
+    const { showAlert, showConfirm, showToast } = useModal();
+    const navigate = useNavigate();
     const [projects, setProjects] = useState<ProjectChat[]>([]);
     const [selectedProject, setSelectedProject] = useState<ProjectChat | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [negotiationHistory, setNegotiationHistory] = useState<any | null>(null);
+    const [isActionLoading, setIsActionLoading] = useState<string | null>(null); // To track which proposal is being acted on
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false)
@@ -182,9 +192,32 @@ id,
         loadChats();
     }, [user, profile]);
 
+    // Fetch negotiation history for a project
+    const fetchNegotiationHistory = async (projectId: string, proposalId?: string) => {
+        try {
+            const query = supabase
+                .from('proposals')
+                .select('*, editor:profiles!editor_id(full_name), project:projects!project_id(title, budget, client:profiles!client_id(full_name))')
+                .eq('project_id', projectId)
+                .order('created_at', { ascending: true });
+
+            if (proposalId) query.eq('id', proposalId);
+
+            const { data } = await query;
+            setNegotiationHistory(data || []);
+        } catch (err) {
+            console.error('Error fetching negotiation history:', err);
+        }
+    };
+
     // Subscription and message loading
     useEffect(() => {
         if (!selectedProject) return;
+
+        setNegotiationHistory(null);
+        if (selectedProject.project_id) {
+            fetchNegotiationHistory(selectedProject.project_id, selectedProject.is_proposal ? selectedProject.proposal_id : undefined);
+        }
 
         const fetchMessages = async () => {
             const query = supabase.from('messages').select('*').order('created_at', { ascending: true });
@@ -192,56 +225,33 @@ id,
             if (selectedProject.is_proposal) {
                 query.eq('proposal_id', selectedProject.proposal_id);
             } else {
-                // For old messages or project-specific messages, but let's be safe and check project_id if it's not a proposal
                 query.eq('project_id', selectedProject.project_id).is('proposal_id', null);
             }
 
             const { data, error } = await query;
-
-            if (error) {
-                console.error('Error fetching messages:', error);
-            } else {
-                setMessages(data || []);
-            }
+            if (error) console.error('Error fetching messages:', error);
+            else setMessages(data || []);
         };
 
         fetchMessages();
 
         const channel = supabase
-            .channel(`chat - room - ${selectedProject.id} `)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-            }, (payload) => {
-                const newMessage = payload.new as Message;
-
-                // Filter locally to ensure it belongs to the current chat room
+            .channel(`chat-room-${selectedProject.id}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                const newMsg = payload.new as Message;
                 if (selectedProject.is_proposal) {
-                    if (newMessage.proposal_id === selectedProject.proposal_id) {
-                        setMessages(prev => {
-                            // Check if message already exists (optimistic UI)
-                            if (prev.find(m => m.id === newMessage.id)) return prev;
-                            const updated = [...prev, newMessage];
-                            return updated;
-                        });
+                    if (newMsg.proposal_id === selectedProject.proposal_id) {
+                        setMessages(prev => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
                     }
                 } else {
-                    if (newMessage.project_id === selectedProject.project_id && !newMessage.proposal_id) {
-                        setMessages(prev => {
-                            // Check if message already exists (optimistic UI)
-                            if (prev.find(m => m.id === newMessage.id)) return prev;
-                            const updated = [...prev, newMessage];
-                            return updated;
-                        });
+                    if (newMsg.project_id === selectedProject.project_id && !newMsg.proposal_id) {
+                        setMessages(prev => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
                     }
                 }
             })
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, [selectedProject]);
 
     useEffect(() => {
@@ -290,15 +300,136 @@ id,
         }
     };
 
+    // Client: Accept and Contract (Escrow Lock)
+    const handleAcceptProposalFromChat = async (prop: any) => {
+        if (!user || !profile || isActionLoading) return;
+        
+        const finalPrice = Number(prop.counter_price || prop.offered_price || prop.project?.budget || 0);
+        
+        const confirmed = await showConfirm(
+            'Confirmar Contratação',
+            `Confirmar contratação por R$ ${finalPrice}? O valor será reservado do seu saldo.`
+        );
+        if (!confirmed) return;
+
+        setIsActionLoading(prop.id);
+        try {
+            // 1. Get latest balance
+            const { data: latestProfile, error: profErr } = await supabase
+                .from('profiles')
+                .select('balance, frozen_balance')
+                .eq('id', user.id)
+                .single();
+            if (profErr) throw profErr;
+
+            if (Number(latestProfile.balance) < finalPrice) {
+                const missing = finalPrice - Number(latestProfile.balance);
+                const goToRecharge = await showConfirm(
+                    'Saldo Insuficiente',
+                    `Você tem R$ ${latestProfile.balance}, mas o projeto custa R$ ${finalPrice}. Deseja recarregar R$ ${missing} para continuar?`
+                );
+                if (goToRecharge) {
+                    navigate(`/dashboard?deposit=true&amount=${missing}`);
+                }
+                return;
+            }
+
+            // 2. Lock Balance
+            const { error: balanceErr } = await supabase
+                .from('profiles')
+                .update({
+                    balance: Number(latestProfile.balance) - finalPrice,
+                    frozen_balance: Number(latestProfile.frozen_balance || 0) + finalPrice
+                })
+                .eq('id', user.id);
+            if (balanceErr) throw balanceErr;
+
+            // 3. Update Proposal
+            const { error: propErr } = await supabase
+                .from('proposals')
+                .update({ status: 'accepted' })
+                .eq('id', prop.id);
+            if (propErr) throw propErr;
+
+            // 4. Update Project
+            const { error: projErr } = await supabase
+                .from('projects')
+                .update({
+                    status: 'Em Edição',
+                    editor_id: prop.editor_id,
+                    final_price: finalPrice
+                })
+                .eq('id', prop.project_id);
+            if (projErr) throw projErr;
+
+            // 5. Log Transaction
+            await supabase.from('wallet_transactions').insert({
+                user_id: user.id,
+                amount: finalPrice,
+                type: 'ESCROW_LOCK',
+                status: 'SUCCESS',
+                description: `Contratação via Chat: ${prop.project?.title}`
+            });
+
+            showAlert('Sucesso!', 'Contrato firmado! Saldo reservado e projeto iniciado.', 'success');
+            
+            // Refresh
+            fetchNegotiationHistory(prop.project_id);
+            if (selectedProject) {
+                setSelectedProject({ ...selectedProject, status: 'Em Edição' });
+            }
+        } catch (err: any) {
+            console.error('Error accepting in chat:', err);
+            showAlert('Erro', `Erro: ${err.message}`, 'error');
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    // Editor: Accept Client's Price
+    const handleEditorAcceptValue = async (prop: any) => {
+        if (!user || isActionLoading) return;
+        
+        const price = Number(prop.counter_price);
+        const confirmed = await showConfirm(
+            'Aceitar Valor',
+            `Aceitar fazer este projeto por R$ ${price}?`
+        );
+        if (!confirmed) return;
+
+        setIsActionLoading(prop.id);
+        try {
+            const { error } = await supabase
+                .from('proposals')
+                .update({
+                    offered_price: price,
+                    counter_price: null,
+                    last_sender_id: user.id
+                })
+                .eq('id', prop.id);
+            
+            if (error) throw error;
+            showAlert('Sucesso!', 'Você aceitou o valor! O cliente agora pode finalizar o pagamento.', 'success');
+            fetchNegotiationHistory(prop.project_id);
+        } catch (err: any) {
+            alert(`Erro: ${err.message}`);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !selectedProject || !newMessage.trim() || sending) return;
 
         // Restriction: Editor can only send if proposal is accepted or it's a regular project chat
+        // REMOVED at user request to allow negotiation in chat
+        /*
         if (profile?.role === 'editor' && selectedProject.is_proposal && selectedProject.status === 'Pendente') {
             alert('Você só poderá enviar mensagens após o cliente aceitar sua proposta.');
             return;
         }
+        */
 
         const content = newMessage.trim();
         const tempId = `temp - ${Date.now()} `;
@@ -550,13 +681,190 @@ id,
                         {/* Project Files Bar (Removed as it's now in Modal) */}
 
                         {/* Messages Body */}
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {messages.length === 0 ? (
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '16px' }}>
-                                    <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'rgba(0, 0, 0, 0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <MessageSquare size={32} style={{ opacity: 0.2 }} />
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                            {/* ── Negotiation History Timeline ── */}
+                            {negotiationHistory && negotiationHistory.length > 0 && (
+                                <div style={{ marginBottom: '8px' }}>
+                                    {/* Section header */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                                            📋 Histórico de Negociação
+                                        </span>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
                                     </div>
-                                    <p style={{ fontSize: '0.9rem' }}>Nenhuma mensagem ainda. Inicie a conversa!</p>
+
+                                    {negotiationHistory.map((prop: any) => {
+                                        const budget = Number(prop.project?.budget || 0);
+                                        const offered = prop.offered_price ? Number(prop.offered_price) : null;
+                                        const counter = prop.counter_price ? Number(prop.counter_price) : null;
+                                        const isAccepted = prop.status === 'accepted';
+
+                                        return (
+                                        <div key={prop.id} style={{
+                                            borderRadius: '18px', overflow: 'hidden', marginBottom: '12px',
+                                            border: `1px solid ${isAccepted ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.15)'}`,
+                                            background: isAccepted
+                                                ? 'linear-gradient(135deg, rgba(34,197,94,0.04), rgba(0,0,0,0.2))'
+                                                : 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(0,0,0,0.2))'
+                                        }}>
+                                            {/* Accent bar */}
+                                            <div style={{ height: '2px', background: isAccepted ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
+
+                                            <div style={{ padding: '16px 20px' }}>
+                                                {/* Row 1: Editor + Status */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <div style={{
+                                                            width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                                                            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontWeight: 800, fontSize: '0.9rem', color: 'white'
+                                                        }}>{(prop.editor?.full_name || 'E')[0].toUpperCase()}</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{prop.editor?.full_name || 'Editor'}</div>
+                                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                {new Date(prop.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <span style={{
+                                                        fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '100px',
+                                                        background: isAccepted ? 'rgba(34,197,94,0.12)' : 'rgba(251,191,36,0.1)',
+                                                        color: isAccepted ? '#22c55e' : '#fbbf24',
+                                                        display: 'flex', alignItems: 'center', gap: '4px'
+                                                    }}>
+                                                        {isAccepted ? <><CheckCircle2 size={11} /> Aceita</> : '⏳ Pendente'}
+                                                    </span>
+                                                </div>
+
+                                                {/* Row 2: Price timeline */}
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                                                    padding: '12px 16px', borderRadius: '12px',
+                                                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                                                    marginBottom: '12px'
+                                                }}>
+                                                    {/* Client budget */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Budget</span>
+                                                        <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-muted)' }}>R$ {budget}</span>
+                                                    </div>
+
+                                                    {offered && (
+                                                        <>
+                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                <span style={{ fontSize: '0.6rem', color: '#6366f1', textTransform: 'uppercase', fontWeight: 700 }}>Editor pediu</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: offered > budget ? '#fbbf24' : '#4ade80' }}>R$ {offered}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    {counter && (
+                                                        <>
+                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                <span style={{ fontSize: '0.6rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Cliente contra</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#38bdf8' }}>R$ {counter}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    {isAccepted && (
+                                                        <>
+                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                <span style={{ fontSize: '0.6rem', color: '#22c55e', textTransform: 'uppercase', fontWeight: 700 }}>Fechado</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#22c55e' }}>R$ {counter || offered || budget}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                {/* Cover letter */}
+                                                {prop.cover_letter && (
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, fontStyle: 'italic', display: 'flex', gap: '8px' }}>
+                                                        <FileText size={13} style={{ flexShrink: 0, marginTop: '3px', opacity: 0.5 }} />
+                                                        <span>{prop.cover_letter}</span>
+                                                    </div>
+                                                )}
+                                                {/* Action Buttons for Negotiation */}
+                                                {!isAccepted && selectedProject?.status === 'Aberto' && (
+                                                    <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                                                        {/* Client UI: Accept Editor's Proposal */}
+                                                        {profile?.role === 'client' && prop.last_sender_id === prop.editor_id && (
+                                                            <button 
+                                                                onClick={() => handleAcceptProposalFromChat(prop)}
+                                                                disabled={!!isActionLoading}
+                                                                style={{
+                                                                    flex: 1, padding: '10px', borderRadius: '12px', border: 'none',
+                                                                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                                                    color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                                                    boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
+                                                                }}
+                                                            >
+                                                                {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                                Aceitar e Contratar (R$ {offered})
+                                                            </button>
+                                                        )}
+
+                                                        {/* Client UI: Wait for Editor to respond to client's counter */}
+                                                        {profile?.role === 'client' && prop.last_sender_id === user?.id && (
+                                                            <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                Aguardando resposta do editor...
+                                                            </div>
+                                                        )}
+
+                                                        {/* Editor UI: Accept Client's Counter-proposal */}
+                                                        {profile?.role === 'editor' && prop.last_sender_id !== user?.id && counter && (
+                                                            <button 
+                                                                onClick={() => handleEditorAcceptValue(prop)}
+                                                                disabled={!!isActionLoading}
+                                                                style={{
+                                                                    flex: 1, padding: '10px', borderRadius: '12px', border: 'none',
+                                                                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                                                                    color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                                                    boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
+                                                                }}
+                                                            >
+                                                                {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                                Aceitar R$ {counter}
+                                                            </button>
+                                                        )}
+
+                                                        {/* Editor UI: Wait for Client if Editor was last to propose */}
+                                                        {profile?.role === 'editor' && prop.last_sender_id === user?.id && (
+                                                            <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                Aguardando aceite do cliente...
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        );
+                                    })}
+
+                                    {/* Divider before messages */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', marginBottom: '8px' }}>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                                            💬 Conversa
+                                        </span>
+                                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Regular messages */}
+                            {messages.length === 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '12px', padding: '32px 0', opacity: 0.7 }}>
+                                    <MessageSquare size={28} style={{ opacity: 0.3 }} />
+                                    <p style={{ fontSize: '0.85rem' }}>Nenhuma mensagem ainda. Inicie a conversa!</p>
                                 </div>
                             ) : (
                                 messages.map((m) => {
@@ -572,7 +880,7 @@ id,
                                             <div style={{
                                                 padding: '12px 20px',
                                                 borderRadius: isMe ? '20px 20px 0 20px' : '20px 20px 20px 0',
-                                                background: isMe ? 'var(--accent)' : 'rgba(0, 0, 0, 0.05)',
+                                                background: isMe ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
                                                 color: isMe ? '#000' : 'var(--text-main)',
                                                 fontSize: '0.95rem',
                                                 lineHeight: 1.5,
@@ -599,12 +907,7 @@ id,
                                     type="text"
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
-                                    disabled={profile?.role === 'editor' && selectedProject.is_proposal && selectedProject.status === 'Pendente'}
-                                    placeholder={
-                                        (profile?.role === 'editor' && selectedProject.is_proposal && selectedProject.status === 'Pendente')
-                                            ? "Aguarde o aceite da proposta para enviar mensagens..."
-                                            : "Digite sua mensagem..."
-                                    }
+                                    placeholder="Digite sua mensagem..."
                                     style={{
                                         flex: 1,
                                         padding: '14px 20px',

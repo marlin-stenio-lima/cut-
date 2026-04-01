@@ -12,14 +12,15 @@ import {
     Menu,
     X,
     Sun,
-    Moon
+    Moon,
+    Shield
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
 interface DashboardLayoutProps {
     children: React.ReactNode
-    role: 'client' | 'editor'
+    role: 'client' | 'editor' | 'admin'
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => {
@@ -38,10 +39,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
         { icon: <PlusCircle size={20} />, label: 'Novo Projeto', path: '/dashboard/new-project' },
         { icon: <Briefcase size={20} />, label: 'Meus Projetos', path: '/dashboard/projects' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
-    ] : [
+    ] : role === 'editor' ? [
         { icon: <LayoutDashboard size={20} />, label: 'Home', path: '/dashboard' },
         { icon: <Video size={20} />, label: 'Explorar Projetos', path: '/dashboard/explore' },
         { icon: <Briefcase size={20} />, label: 'Minhas Edições', path: '/dashboard/work' },
+        { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
+    ] : [
+        // Admin Navigation
+        { icon: <LayoutDashboard size={20} />, label: 'Visão Geral', path: '/dashboard' },
+        { icon: <Shield size={20} />, label: 'Administração', path: '/dashboard/admin' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
     ]
 
@@ -70,20 +76,21 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
                 <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`} style={{
                     width: '280px',
                     background: 'var(--bg-deep)',
-                    backdropFilter: 'blur(10px)',
+                    backdropFilter: 'blur(20px)',
                     borderRight: '1px solid var(--glass-border)',
+                    boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
                     display: 'flex',
                     flexDirection: 'column',
-                    padding: '32px 20px',
+                    padding: '32px 24px', // Standardized Top Padding
                     position: 'fixed',
                     height: '100vh',
                     zIndex: 100,
                     top: 0,
                     left: 0
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px', padding: '0 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px', padding: '0 8px' }}>
                         <Logo />
-                        {/* Close button only visible on mobile (handled by css implicitly because sidebar slides away but visually nice to have) */}
+                        {/* Close button only visible on mobile */}
                         <button
                             className="close-menu-btn"
                             onClick={() => setIsMobileMenuOpen(false)}
