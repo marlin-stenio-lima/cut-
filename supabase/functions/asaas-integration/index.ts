@@ -18,84 +18,115 @@ serve(async (req) => {
 
   try {
     const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")
-    console.log(`[Asaas Integration] Environment check: ASAAS_API_KEY present: ${!!ASAAS_API_KEY}`)
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      console.error("[Asaas Integration] Error: No Authorization header")
-      throw new Error("Não autorizado: Cabeçalho de autenticação ausente")
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRole || !ASAAS_API_KEY) {
-      console.error("[Asaas Integration] Error: Missing environment variables")
+    if (!supabaseUrl || !supabaseServiceRole || !ASAAS_API_KEY) {
       throw new Error("Configuração do servidor incompleta (Variáveis de ambiente)")
     }
 
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
+    const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRole)
+    const body = await req.json()
 
-    // Verify user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    if (authError || !user) {
-      console.error("[Asaas Integration] Auth Error:", authError)
-      throw new Error("Não autorizado: Sessão inválida")
+    // --- 1. WEBHOOK HANDLER (No Auth Required) ---
+    if (body.event) {
+        console.log(`[Asaas Webhook] Event: ${body.event}, Payment: ${body.payment?.id}`)
+        
+        const event = body.event
+        const payment = body.payment
+        
+        if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(event)) {
+            const userId = payment.externalReference
+            const paymentId = payment.id
+            const amount = payment.value
+
+            if (!userId) {
+                console.error("[Asaas Webhook] Error: Missing externalReference (userId)")
+                return new Response(JSON.stringify({ received: true, error: "Missing userId" }), { status: 200 })
+            }
+
+            // Sync balance logic
+            const { data: existingTx } = await serviceRoleClient
+                .from('wallet_transactions')
+                .select('*')
+                .eq('asaas_id', paymentId)
+                .eq('status', 'SUCCESS')
+                .maybeSingle()
+
+            if (!existingTx) {
+                console.log(`[Asaas Webhook] Processing payment of R$ ${amount} for user ${userId}`)
+                
+                // 1. Update status
+                await serviceRoleClient
+                    .from('wallet_transactions')
+                    .update({ status: 'SUCCESS' })
+                    .eq('asaas_id', paymentId)
+
+                // 2. Increment balance
+                const { data: profile } = await serviceRoleClient
+                    .from('profiles')
+                    .select('balance')
+                    .eq('id', userId)
+                    .single()
+                
+                const newBalance = Number(profile?.balance || 0) + Number(amount)
+                
+                await serviceRoleClient
+                    .from('profiles')
+                    .update({ balance: newBalance })
+                    .eq('id', userId)
+
+                console.log(`[Asaas Webhook] Balance updated successfully for user ${userId}`)
+            }
+
+            return new Response(JSON.stringify({ received: true }), { 
+                headers: { 'Content-Type': 'application/json' },
+                status: 200 
+            })
+        }
+
+        // Generic received for other events
+        return new Response(JSON.stringify({ received: true }), { status: 200 })
     }
 
+    // --- 2. APP ACTIONS (Auth Required) ---
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error("Não autorizado: Cabeçalho de autenticação ausente")
+    }
+
+    const { data: { user }, error: authError } = await (createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } }
+    })).auth.getUser()
+    
+    if (authError || !user) throw new Error("Não autorizado: Sessão inválida")
+    
     const userId = user.id
-    const body = await req.json()
     console.log(`[Asaas Integration] Action: ${body.action}, User: ${userId}`)
 
     // --- SHARED UTILS ---
-    const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRole)
-    
     const getProfile = async (uid: string) => {
       const { data, error } = await serviceRoleClient.from('profiles').select('*').eq('id', uid).single()
       if (error || !data) throw new Error("Perfil não encontrado")
       return data
     }
 
-    const checkAdmin = async (uid: string) => {
-      const p = await getProfile(uid)
-      if (p.role !== 'admin') throw new Error("Acesso negado: Somente administradores")
-      return p
-    }
-
     // --- ACTIONS ---
-
     if (body.action === 'create-payment') {
       const profile = await getProfile(userId)
       let asaasCustomerId = profile.asaas_customer_id
-
-      // Create/Update customer
       const customerName = body.name || profile.full_name || 'Cliente Cut House'
       const customerEmail = body.email || user.email || `${userId}@cuthouse.com.br`
       
       if (asaasCustomerId) {
-        // Verify/Update existing
         const checkRes = await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
           method: 'GET',
           headers: { 'access_token': ASAAS_API_KEY }
         })
-        
-        if (checkRes.status === 404) {
-          // Customer ID is from Sandbox or doesn't exist in production, reset it
-          asaasCustomerId = null
-        } else if (checkRes.ok) {
-          // Customer exists, update their details
-          await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
-            body: JSON.stringify({ name: customerName, email: customerEmail, cpfCnpj: body.cpf, mobilePhone: body.phone })
-          })
-        }
+        if (checkRes.status === 404) asaasCustomerId = null
       }
       
       if (!asaasCustomerId) {
-        // Create new customer for the current environment
         const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
@@ -103,7 +134,6 @@ serve(async (req) => {
         })
         const createData = await createRes.json()
         if (createData.errors) throw new Error(`Erro Asaas (Cliente): ${createData.errors[0].description}`)
-        
         asaasCustomerId = createData.id
         await serviceRoleClient.from('profiles').update({ asaas_customer_id: asaasCustomerId, full_name: customerName }).eq('id', userId)
       }
@@ -137,57 +167,14 @@ serve(async (req) => {
       const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(paymentData.status)
 
       if (paymentData.billingType === 'PIX') {
-        const pixResponse = await fetch(`${ASAAS_API_URL}/payments/${paymentId}/pixQrCode`, {
+        const pixRes = await fetch(`${ASAAS_API_URL}/payments/${paymentId}/pixQrCode`, {
             headers: { 'access_token': ASAAS_API_KEY }
         })
-        const pixData = await pixResponse.json()
-        
-        return new Response(
-          JSON.stringify({ payment: paymentData, pix: pixData }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        )
+        const pixData = await pixRes.json()
+        return new Response(JSON.stringify({ payment: paymentData, pix: pixData }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
       }
 
-      // If payment is confirmed, update balance (Simulation/Direct)
-      if (isPaid) {
-          console.log(`[Asaas Integration] Updating balance for user ${userId} due to payment ${paymentId}`)
-          
-          const { data: existingTx } = await serviceRoleClient
-            .from('wallet_transactions')
-            .select('*')
-            .eq('asaas_id', paymentId)
-            .eq('status', 'SUCCESS')
-            .maybeSingle()
-
-          if (!existingTx) {
-            await serviceRoleClient
-              .from('wallet_transactions')
-              .update({ status: 'SUCCESS' })
-              .eq('asaas_id', paymentId)
-
-            const { data: profile } = await serviceRoleClient
-              .from('profiles')
-              .select('balance')
-              .eq('id', userId)
-              .single()
-            
-            const newBalance = Number(profile?.balance || 0) + Number(paymentData.value)
-            
-            await serviceRoleClient
-              .from('profiles')
-              .update({ balance: newBalance })
-              .eq('id', userId)
-          }
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          status: paymentData.status,
-          isPaid,
-          payment: paymentData
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      )
+      return new Response(JSON.stringify({ status: paymentData.status, isPaid, payment: paymentData }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     }
 
     throw new Error(`Ação inválida: ${body.action}`)
