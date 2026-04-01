@@ -30,7 +30,7 @@ serve(async (req) => {
 
     // --- 1. WEBHOOK HANDLER (No Auth Required) ---
     if (body.event) {
-        console.log(`[Asaas Webhook] Event: ${body.event}, Payment: ${body.payment?.id}`)
+        console.log(`[Asaas Webhook] Event: ${body.event}, Payment: ${body.payment?.id}, Ref: ${body.payment?.externalReference}`)
         
         const event = body.event
         const payment = body.payment
@@ -38,7 +38,7 @@ serve(async (req) => {
         if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(event)) {
             const userId = payment.externalReference
             const paymentId = payment.id
-            const amount = payment.value
+            const amount = Number(payment.value)
 
             if (!userId) {
                 console.error("[Asaas Webhook] Error: Missing externalReference (userId)")
@@ -50,17 +50,30 @@ serve(async (req) => {
                 .from('wallet_transactions')
                 .select('*')
                 .eq('asaas_id', paymentId)
-                .eq('status', 'SUCCESS')
                 .maybeSingle()
 
-            if (!existingTx) {
+            if (!existingTx || existingTx.status === 'PENDING') {
                 console.log(`[Asaas Webhook] Processing payment of R$ ${amount} for user ${userId}`)
                 
-                // 1. Update status
-                await serviceRoleClient
-                    .from('wallet_transactions')
-                    .update({ status: 'SUCCESS' })
-                    .eq('asaas_id', paymentId)
+                if (!existingTx) {
+                    // Create if doesn't exist
+                    await serviceRoleClient
+                        .from('wallet_transactions')
+                        .insert({
+                            user_id: userId,
+                            amount: amount,
+                            type: 'deposit',
+                            status: 'SUCCESS',
+                            description: 'Depósito via PIX/Cartão',
+                            asaas_id: paymentId
+                        })
+                } else {
+                    // Update to success
+                    await serviceRoleClient
+                        .from('wallet_transactions')
+                        .update({ status: 'SUCCESS' })
+                        .eq('asaas_id', paymentId)
+                }
 
                 // 2. Increment balance
                 const { data: profile } = await serviceRoleClient
@@ -69,8 +82,11 @@ serve(async (req) => {
                     .eq('id', userId)
                     .single()
                 
-                const newBalance = Number(profile?.balance || 0) + Number(amount)
+                const currentBalance = Number(profile?.balance || 0)
+                const newBalance = currentBalance + amount
                 
+                console.log(`[Asaas Webhook] Updating balance: ${currentBalance} -> ${newBalance}`)
+
                 await serviceRoleClient
                     .from('profiles')
                     .update({ balance: newBalance })
@@ -85,7 +101,6 @@ serve(async (req) => {
             })
         }
 
-        // Generic received for other events
         return new Response(JSON.stringify({ received: true }), { status: 200 })
     }
 
@@ -139,10 +154,11 @@ serve(async (req) => {
       }
 
       // Create charge
+      const amount = Number(body.amount)
       const paymentPayload: any = {
         customer: asaasCustomerId,
         billingType: body.billingType || 'PIX',
-        value: body.amount,
+        value: amount,
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         description: body.description || 'Pagamento Cut House',
         externalReference: userId,
@@ -165,6 +181,18 @@ serve(async (req) => {
 
       const paymentId = paymentData.id
       const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(paymentData.status)
+
+      // Proactively insert pending transaction so it shows in the UI immediately
+      await serviceRoleClient
+        .from('wallet_transactions')
+        .insert({
+            user_id: userId,
+            amount: amount,
+            type: 'deposit',
+            status: isPaid ? 'SUCCESS' : 'PENDING',
+            description: 'Recarga de Saldo',
+            asaas_id: paymentId
+        })
 
       if (paymentData.billingType === 'PIX') {
         const pixRes = await fetch(`${ASAAS_API_URL}/payments/${paymentId}/pixQrCode`, {
