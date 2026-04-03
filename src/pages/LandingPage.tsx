@@ -95,7 +95,7 @@ const LandingPage: React.FC = () => {
                 </p>
 
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <Link to="/register" style={{
+                    <Link to="/marketplace" style={{
                         background: '#07b6d5',
                         color: '#000000',
                         padding: '16px 32px',
@@ -110,7 +110,7 @@ const LandingPage: React.FC = () => {
                     }} className="btn-hover-solid">
                         Encontrar Editores <ArrowRight size={18} />
                     </Link>
-                    <Link to="/register" style={{
+                    <Link to="/register/editor" style={{
                         padding: '16px 32px',
                         color: '#ffffff',
                         fontSize: '1.05rem',
@@ -226,7 +226,7 @@ const LandingPage: React.FC = () => {
                         ★★★★★
                     </div>
                     <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.5rem)', fontWeight: 500, lineHeight: 1.4, marginBottom: '40px', letterSpacing: '-0.01em' }}>
-                        "A CutHouse é uma excelente plataforma de conexão. Simples de usar e com uma rede de parceiros diversificada. Já são incontáveis vídeos produzidos e todos realizados de forma incrivelmente eficiente e com qualidade altíssima."
+                        "A Easy Content é uma excelente plataforma de conexão. Simples de usar e com uma rede de parceiros diversificada. Já são incontáveis vídeos produzidos e todos realizados de forma incrivelmente eficiente e com qualidade altíssima."
                     </h2>
                     <div>
                         <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '4px' }}>Ana Carolina Soares</div>
@@ -244,7 +244,7 @@ const LandingPage: React.FC = () => {
                     <p style={{ color: '#a0a0a0', fontSize: '1.1rem', marginBottom: '40px', lineHeight: 1.6 }}>
                         Junte-se a centenas de empresas que já otimizaram sua produção audiovisual com a nossa rede qualificada.
                     </p>
-                    <Link to="/register" style={{
+                    <Link to="/marketplace" style={{
                         background: '#ffffff',
                         color: '#000000',
                         padding: '18px 40px',
@@ -257,7 +257,7 @@ const LandingPage: React.FC = () => {
                         gap: '8px',
                         transition: 'transform 0.2s'
                     }} className="btn-hover-scale">
-                        Criar Projeto Grátis
+                        Explorar Editores Gratuitamente
                     </Link>
                 </div>
             </section>
@@ -294,7 +294,7 @@ const LandingPage: React.FC = () => {
                     </div>
 
                     <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                        <span style={{ color: '#666666', fontSize: '0.85rem' }}>© 2026 CutHouse. Todos os direitos reservados.</span>
+                        <span style={{ color: '#666666', fontSize: '0.85rem' }}>© 2026 Easy Content. Todos os direitos reservados.</span>
                     </div>
 
                 </div>

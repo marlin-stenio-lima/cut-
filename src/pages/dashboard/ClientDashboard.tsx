@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, Briefcase, Clock, CheckCircle, TrendingUp, Loader2, CreditCard, Wallet, X, ChevronRight, Bell, User, Lock, Calendar, MapPin, ShieldCheck, Globe, FileText, Phone } from 'lucide-react'
+import { Plus, Briefcase, Clock, CheckCircle, Loader2, CreditCard, Wallet, X, ChevronRight, Bell, User, Lock, Calendar, MapPin, ShieldCheck, Globe, FileText, Phone } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useModal } from '../../context/ModalContext'
@@ -170,8 +170,6 @@ const ClientDashboard: React.FC = () => {
     const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'Em Edição').length
     const reviewProjects = projects.filter(p => p.status === 'review' || p.status === 'Revisão' || p.status === 'Aguardando Pagamento').length
     const finishedProjects = projects.filter(p => p.status === 'completed' || p.status === 'Concluído').length
-    const totalInvestment = projects.reduce((acc, curr) => acc + (Number(curr.budget) || 0), 0)
-    const formattedInvestment = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalInvestment)
     const recentProjects = projects.slice(0, 4)
 
     if (loading) {
@@ -209,7 +207,6 @@ const ClientDashboard: React.FC = () => {
                         <StatsCard title="Ativos" value={activeProjects} icon={<Briefcase size={20} />} color="#38bdf8" />
                         <StatsCard title="Revisão" value={reviewProjects} icon={<Clock size={20} />} color="#fbbf24" />
                         <StatsCard title="Finalizados" value={finishedProjects} icon={<CheckCircle size={20} />} color="#4ade80" />
-                        <StatsCard title="Total" value={formattedInvestment} icon={<TrendingUp size={20} />} color="#a855f7" />
                     </div>
 
                     {/* Recent Projects Section */}

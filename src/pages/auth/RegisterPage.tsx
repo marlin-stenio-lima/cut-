@@ -41,6 +41,7 @@ const RegisterPage: React.FC = () => {
                     data: {
                         full_name: fullName,
                         phone: phone,
+                        role: 'client'
                     }
                 }
             })
@@ -48,9 +49,9 @@ const RegisterPage: React.FC = () => {
             if (signupError) throw signupError
 
             if (data.user) {
-                console.log('[RegisterPage] Signup success! Navigating to profile selection...')
+                console.log('[RegisterPage] Signup success! Navigating to dashboard...')
                 setTimeout(() => {
-                    navigate('/profile-selection')
+                    navigate('/dashboard')
                 }, 1000)
             }
         } catch (err: any) {

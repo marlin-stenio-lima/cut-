@@ -4,9 +4,11 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ModalProvider } from './context/ModalContext'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
-import ProfileSelectionPage from './pages/auth/ProfileSelectionPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import LandingPage from './pages/LandingPage'
+import EditorRegistrationPage from './pages/auth/EditorRegistrationPage'
+import EditorThanksPage from './pages/auth/EditorThanksPage'
+import MarketplacePage from './pages/MarketplacePage'
 import './App.css'
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -38,7 +40,9 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/profile-selection" element={<ProfileSelectionPage />} />
+              <Route path="/register/editor" element={<EditorRegistrationPage />} />
+              <Route path="/register/thanks" element={<EditorThanksPage />} />
+              <Route path="/marketplace" element={<MarketplacePage />} />
               <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
               <Route path="/dashboard/*" element={
                 <PrivateRoute>

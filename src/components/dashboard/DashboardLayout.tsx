@@ -13,7 +13,9 @@ import {
     X,
     Sun,
     Moon,
-    Shield
+    Shield,
+    Users,
+    Wallet
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -38,11 +40,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
         { icon: <LayoutDashboard size={20} />, label: 'Visão Geral', path: '/dashboard' },
         { icon: <PlusCircle size={20} />, label: 'Novo Projeto', path: '/dashboard/new-project' },
         { icon: <Briefcase size={20} />, label: 'Meus Projetos', path: '/dashboard/projects' },
+        { icon: <Users size={20} />, label: 'Marketplace', path: '/dashboard/marketplace' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
     ] : role === 'editor' ? [
         { icon: <LayoutDashboard size={20} />, label: 'Home', path: '/dashboard' },
         { icon: <Video size={20} />, label: 'Explorar Projetos', path: '/dashboard/explore' },
         { icon: <Briefcase size={20} />, label: 'Minhas Edições', path: '/dashboard/work' },
+        { icon: <Wallet size={20} />, label: 'Carteira / Banco', path: '/dashboard/bank' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
     ] : [
         // Admin Navigation

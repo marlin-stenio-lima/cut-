@@ -11,6 +11,8 @@ import MyProjectsPage from './client/MyProjectsPage'
 import ExplorePage from './editor/ExplorePage'
 import MyWorkPage from './editor/MyWorkPage'
 import EditorOnboarding from './editor/EditorOnboarding'
+import MarketplacePage from './client/MarketplacePage'
+import BankPage from './editor/BankPage'
 import AdminDashboard from './AdminDashboard'
 
 const DashboardPage: React.FC = () => {
@@ -30,11 +32,17 @@ const DashboardPage: React.FC = () => {
     }
 
     // New: If editor and missing onboarding data, force onboarding
-    if (profile.role === 'editor' && !profile.portfolio_url && !window.location.pathname.includes('onboarding')) {
+    if (profile.role === 'editor' && !profile.portfolio_url && !profile.onboarding_status && !window.location.pathname.includes('onboarding')) {
         return <Navigate to="/dashboard/editor/onboarding" />
     }
 
-    const role = profile.role as 'client' | 'editor' | 'admin'
+    // New: Block editors awaiting approval or rejected
+    if (profile.role === 'editor' && profile.onboarding_status !== 'approved') {
+        console.log('[DashboardPage] Editor not approved yet, redirecting to thanks/status page')
+        return <Navigate to="/register/thanks" replace />
+    }
+
+    const role = (profile.onboarding_status === 'approved' ? 'editor' : profile.role) as 'client' | 'editor' | 'admin'
 
     return (
         <DashboardLayout role={role}>
@@ -55,6 +63,7 @@ const DashboardPage: React.FC = () => {
                     <>
                         <Route path="new-project" element={<NewProjectPage />} />
                         <Route path="projects" element={<MyProjectsPage />} />
+                        <Route path="marketplace" element={<MarketplacePage />} />
                     </>
                 )}
 
@@ -63,6 +72,7 @@ const DashboardPage: React.FC = () => {
                     <>
                         <Route path="explore" element={<ExplorePage />} />
                         <Route path="work" element={<MyWorkPage />} />
+                        <Route path="bank" element={<BankPage />} />
                         <Route path="editor/onboarding" element={<EditorOnboarding />} />
                     </>
                 )}

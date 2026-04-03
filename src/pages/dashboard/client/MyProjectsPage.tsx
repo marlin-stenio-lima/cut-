@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import { useModal } from '../../../context/ModalContext';
-import { Briefcase, Loader2, Video, Clock, ChevronDown, ChevronUp, CheckCircle, ExternalLink, FileText, Play, MessageSquare, Send, Star, Pencil, X, Upload, Trash2 } from 'lucide-react';
+import { Briefcase, Loader2, Video, Clock, ChevronDown, ChevronUp, CheckCircle, ExternalLink, FileText, Play, Send, Star, Pencil, X, Upload, Trash2, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import VideoModal from '../../../components/dashboard/VideoModal';
+import EditorPortfolioModal from '../../../components/dashboard/EditorPortfolioModal';
 
 const MyProjectsPage: React.FC = () => {
     const { user } = useAuth();
@@ -21,6 +22,7 @@ const MyProjectsPage: React.FC = () => {
     const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(null);
     const [previewFile, setPreviewFile] = useState<any | null>(null);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+    const [selectedEditor, setSelectedEditor] = useState<any | null>(null);
     
     // Negotiation state
     const [showCounterModal, setShowCounterModal] = useState<{ proposalId: string, projectId: string } | null>(null);
@@ -36,6 +38,7 @@ const MyProjectsPage: React.FC = () => {
     const [showEditModal, setShowEditModal] = useState<any | null>(null);
     const [editDescription, setEditDescription] = useState('');
     const [editRyverLink, setEditRyverLink] = useState('');
+    const [editDeadline, setEditDeadline] = useState('');
     const [editFiles, setEditFiles] = useState<any[]>([]);
     const [isUploadingEdit, setIsUploadingEdit] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -53,9 +56,9 @@ const MyProjectsPage: React.FC = () => {
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(blobUrl);
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error downloading file:', err);
-            window.open(url, '_blank'); // Fallback to opening in new tab if download fails
+            window.open(url, '_blank');
         } finally {
             setDownloadingFile(null);
         }
@@ -94,12 +97,11 @@ const MyProjectsPage: React.FC = () => {
         setLoadingProposals(true);
 
         try {
-            // Fetch proposals and join with editor profile to get the name
             const { data, error } = await supabase
                 .from('proposals')
                 .select(`
                     *,
-                    editor:profiles!editor_id(full_name)
+                    editor:profiles!editor_id(*)
                 `)
                 .eq('project_id', projectId)
                 .order('created_at', { ascending: false });
@@ -126,7 +128,6 @@ const MyProjectsPage: React.FC = () => {
         setAcceptingProposalId(proposal.id);
 
         try {
-            // 1. Check Client Balance
             const { data: profile, error: profErr } = await supabase
                 .from('profiles')
                 .select('balance, frozen_balance')
@@ -147,7 +148,6 @@ const MyProjectsPage: React.FC = () => {
                 return;
             }
 
-            // 2. Lock Balance (Escrow)
             const { error: balanceErr } = await supabase
                 .from('profiles')
                 .update({
@@ -158,7 +158,6 @@ const MyProjectsPage: React.FC = () => {
             
             if (balanceErr) throw balanceErr;
 
-            // 3. Update the proposal status to 'accepted'
             const { error: propError } = await supabase
                 .from('proposals')
                 .update({ status: 'accepted' })
@@ -166,7 +165,6 @@ const MyProjectsPage: React.FC = () => {
 
             if (propError) throw propError;
 
-            // 4. Update the project status and assign editor
             const { error: projError } = await supabase
                 .from('projects')
                 .update({
@@ -178,7 +176,6 @@ const MyProjectsPage: React.FC = () => {
 
             if (projError) throw projError;
 
-            // Create Escrow Transaction Record
             await supabase.from('wallet_transactions').insert({
                 user_id: user?.id,
                 amount: finalPrice,
@@ -187,7 +184,6 @@ const MyProjectsPage: React.FC = () => {
                 description: `Valor reservado para o projeto: ${projects.find(p => p.id === projectId)?.title}`
             });
 
-            // Update local state
             setProjects(prev => prev.map(p =>
                 p.id === projectId ? { ...p, status: 'Em Edição', editor_id: proposal.editor_id, final_price: finalPrice } : p
             ));
@@ -229,7 +225,7 @@ const MyProjectsPage: React.FC = () => {
             showToast('Contraproposta enviada!', 'success');
             setShowCounterModal(null);
             setCounterPrice('');
-            handleExpandProject(showCounterModal.projectId); // Refresh UI
+            handleExpandProject(showCounterModal.projectId);
 
         } catch (err: any) {
             alert(`Erro ao enviar contraproposta: ${err.message}`);
@@ -248,7 +244,7 @@ const MyProjectsPage: React.FC = () => {
                 .update({
                     client_finished_at: new Date().toISOString(),
                     client_review: reviewText.trim(),
-                    status: 'Aguardando Pagamento' // Now goes to Admin for final release
+                    status: 'Aguardando Pagamento'
                 })
                 .eq('id', showReviewModal.id);
 
@@ -257,7 +253,6 @@ const MyProjectsPage: React.FC = () => {
             showAlert('Concluído', 'Projeto finalizado do seu lado! Agora o Admin irá liberar o pagamento para o editor.', 'success');
             setShowReviewModal(null);
             setReviewText('');
-            // Refresh list
             const { data } = await supabase.from('projects').select('*').eq('client_id', user?.id).order('created_at', { ascending: false });
             setProjects(data || []);
 
@@ -273,6 +268,7 @@ const MyProjectsPage: React.FC = () => {
         setShowEditModal(project);
         setEditDescription(project.description || '');
         setEditRyverLink(project.ryver_link || '');
+        setEditDeadline(project.deadline || '');
         setEditFiles(project.project_files || []);
     };
 
@@ -305,12 +301,17 @@ const MyProjectsPage: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('projects')
-                .update({ description: editDescription, ryver_link: editRyverLink, project_files: editFiles })
+                .update({ 
+                    description: editDescription, 
+                    ryver_link: editRyverLink, 
+                    deadline: editDeadline || null,
+                    project_files: editFiles 
+                })
                 .eq('id', showEditModal.id);
             if (error) throw error;
             setProjects(prev => prev.map(p =>
                 p.id === showEditModal.id
-                    ? { ...p, description: editDescription, ryver_link: editRyverLink, project_files: editFiles }
+                    ? { ...p, description: editDescription, ryver_link: editRyverLink, deadline: editDeadline || null, project_files: editFiles }
                     : p
             ));
             setShowEditModal(null);
@@ -557,7 +558,6 @@ const MyProjectsPage: React.FC = () => {
                                                             : 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(0,0,0,0.3) 100%)',
                                                         backdropFilter: 'blur(10px)',
                                                     }}>
-                                                        {/* Top accent bar */}
                                                         <div style={{
                                                             height: '3px',
                                                             background: proposal.status === 'accepted'
@@ -568,11 +568,7 @@ const MyProjectsPage: React.FC = () => {
                                                         }} />
 
                                                         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-                                                            {/* Header row */}
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-
-                                                                {/* Editor info */}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                                                                     <div style={{
                                                                         width: '46px', height: '46px', borderRadius: '14px', flexShrink: 0,
@@ -599,7 +595,6 @@ const MyProjectsPage: React.FC = () => {
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Price block */}
                                                                 <div style={{ textAlign: 'right' }}>
                                                                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em', marginBottom: '4px' }}>
                                                                         {proposal.counter_price ? '🔄 Contraproposta' : '💰 Valor proposto'}
@@ -628,7 +623,6 @@ const MyProjectsPage: React.FC = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Cover letter */}
                                                             <div style={{
                                                                 padding: '14px 18px', borderRadius: '14px', fontSize: '0.92rem', lineHeight: 1.7,
                                                                 color: 'var(--text-main)', fontStyle: 'italic',
@@ -639,7 +633,6 @@ const MyProjectsPage: React.FC = () => {
                                                                 <span style={{ paddingLeft: '10px' }}>{proposal.cover_letter}</span>
                                                             </div>
 
-                                                            {/* Action buttons */}
                                                             <div style={{ display: 'flex', gap: '10px' }}>
                                                                 {proposal.status === 'accepted' ? (
                                                                     <div style={{
@@ -652,6 +645,12 @@ const MyProjectsPage: React.FC = () => {
                                                                     </div>
                                                                 ) : project.status === 'Aberto' ? (
                                                                     <>
+                                                                        <button
+                                                                            onClick={() => setSelectedEditor(proposal.editor)}
+                                                                            style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                                        >
+                                                                            <Users size={16} /> Ver Perfil
+                                                                        </button>
                                                                         <button
                                                                             onClick={() => handleAcceptProposal(proposal, project.id)}
                                                                             disabled={acceptingProposalId === proposal.id}
@@ -669,32 +668,6 @@ const MyProjectsPage: React.FC = () => {
                                                                                 ? <><Loader2 size={16} className="animate-spin" /> Processando...</>
                                                                                 : <><CheckCircle size={16} /> Aceitar e Contratar</>}
                                                                         </button>
-                                                                        <button
-                                                                            onClick={() => setShowCounterModal({ proposalId: proposal.id, projectId: project.id })}
-                                                                            style={{
-                                                                                flex: 1, padding: '13px', borderRadius: '14px',
-                                                                                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                                                                                color: 'var(--text-main)', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-                                                                                transition: 'all 0.2s'
-                                                                            }}
-                                                                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-                                                                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                                                                        >
-                                                                            Negociar
-                                                                        </button>
-                                                                        {proposal.negotiation_round >= 2 && (
-                                                                            <Link
-                                                                                to="/dashboard/chat"
-                                                                                style={{
-                                                                                    padding: '13px 16px', borderRadius: '14px',
-                                                                                    background: 'rgba(7,182,213,0.1)', border: '1px solid rgba(7,182,213,0.2)',
-                                                                                    color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px',
-                                                                                    textDecoration: 'none', fontWeight: 600, fontSize: '0.85rem'
-                                                                                }}
-                                                                            >
-                                                                                <MessageSquare size={16} /> Chat
-                                                                            </Link>
-                                                                        )}
                                                                     </>
                                                                 ) : null}
                                                             </div>
@@ -711,7 +684,7 @@ const MyProjectsPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            {/* Counter Offer Modal */}
+            
             {showCounterModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass" style={{ maxWidth: '400px', width: '100%', borderRadius: '24px', padding: '32px', border: '1px solid var(--glass-border)' }}>
@@ -744,7 +717,6 @@ const MyProjectsPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Review & Finish Modal */}
             {showReviewModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass" style={{ maxWidth: '500px', width: '100%', borderRadius: '24px', padding: '40px', border: '1px solid var(--glass-border)' }}>
@@ -778,7 +750,6 @@ const MyProjectsPage: React.FC = () => {
 
             {previewFile && <VideoModal file={previewFile} status={previewFile.projectStatus} onClose={() => setPreviewFile(null)} />}
 
-            {/* ──────── Edit Project Modal ──────── */}
             {showEditModal && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -790,7 +761,6 @@ const MyProjectsPage: React.FC = () => {
                         border: '1px solid var(--glass-border)', background: 'var(--bg-deep)',
                         display: 'flex', flexDirection: 'column', gap: '24px', maxHeight: '90vh', overflowY: 'auto'
                     }}>
-                        {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
@@ -805,7 +775,6 @@ const MyProjectsPage: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Description */}
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
                                 Descrição / Briefing
@@ -826,7 +795,6 @@ const MyProjectsPage: React.FC = () => {
                             />
                         </div>
 
-                        {/* Reference Link */}
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
                                 Link Google Drive / Ryver
@@ -844,13 +812,28 @@ const MyProjectsPage: React.FC = () => {
                             />
                         </div>
 
-                        {/* Files */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                Prazo Desejado
+                            </label>
+                            <input
+                                type="date"
+                                className="auth-input"
+                                value={editDeadline ? new Date(editDeadline).toISOString().split('T')[0] : ''}
+                                onChange={(e) => setEditDeadline(e.target.value)}
+                                style={{
+                                    width: '100%', padding: '14px 16px', borderRadius: '14px',
+                                    background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
+                                    color: 'white', outline: 'none', fontSize: '0.95rem'
+                                }}
+                            />
+                        </div>
+
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
                                 Arquivos do Projeto
                             </label>
 
-                            {/* Upload zone */}
                             <div
                                 onClick={() => !isUploadingEdit && document.getElementById('edit-file-upload')?.click()}
                                 style={{
@@ -879,7 +862,6 @@ const MyProjectsPage: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Existing files list */}
                             {editFiles.length > 0 && (
                                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {editFiles.map((f: any, idx: number) => (
@@ -908,7 +890,6 @@ const MyProjectsPage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Actions */}
                         <div style={{ display: 'flex', gap: '12px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' }}>
                             <button
                                 onClick={() => setShowEditModal(null)}
@@ -927,6 +908,12 @@ const MyProjectsPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {selectedEditor && (
+                <EditorPortfolioModal 
+                    editor={selectedEditor} 
+                    onClose={() => setSelectedEditor(null)} 
+                />
             )}
         </div>
     );

@@ -20,6 +20,7 @@ serve(async (req) => {
     const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const ASAAS_WEBHOOK_TOKEN = Deno.env.get("ASAAS_WEBHOOK_TOKEN")
 
     if (!supabaseUrl || !supabaseServiceRole || !ASAAS_API_KEY) {
       throw new Error("Configuração do servidor incompleta (Variáveis de ambiente)")
@@ -48,69 +49,88 @@ serve(async (req) => {
 
     // --- 1. WEBHOOK HANDLER (No Auth Required) ---
     if (body.event) {
-        console.log(`[Asaas Webhook] Event: ${body.event}, Payment: ${body.payment?.id}, Ref: ${body.payment?.externalReference}`)
-        
         const event = body.event
+        console.log(`[Asaas Webhook] Event: ${event}, Payment: ${body.payment?.id}, Ref: ${body.payment?.externalReference}`)
+        
+        // --- 1.2 WEBHOOK SECURITY CHECK ---
+        const receivedToken = req.headers.get('asaas-access-token')
+        if (receivedToken !== ASAAS_WEBHOOK_TOKEN) {
+            console.error(`[Asaas Webhook] Security Error: Invalid token received from ${req.headers.get('x-real-ip')}`)
+            return new Response(JSON.stringify({ error: "Unauthorized Webhook" }), { status: 401 })
+        }
         const payment = body.payment
         
         if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(event)) {
             const userId = payment.externalReference
             const paymentId = payment.id
-            const amount = Number(payment.value)
+            const paymentValue = Number(payment.value)
+            const billingType = payment.billingType
 
             if (!userId) {
                 console.error("[Asaas Webhook] Error: Missing externalReference (userId)")
                 return new Response(JSON.stringify({ received: true, error: "Missing userId" }), { status: 200 })
             }
 
-            const { data: existingTx } = await serviceRoleClient
+            // 2. Check for idempotency (Don't process if already SUCCESS)
+            const { data: existingTx, error: selectError } = await serviceRoleClient
                 .from('wallet_transactions')
-                .select('*')
+                .select('status, amount')
                 .eq('asaas_id', paymentId)
                 .maybeSingle()
 
-            if (!existingTx || existingTx.status === 'PENDING') {
-                console.log(`[Asaas Webhook] Processing payment of R$ ${amount} for user ${userId}`)
-                
-                if (!existingTx) {
-                    await serviceRoleClient
-                        .from('wallet_transactions')
-                        .insert({
-                            user_id: userId,
-                            amount: amount,
-                            type: 'deposit',
-                            status: 'SUCCESS',
-                            description: 'Depósito via PIX/Cartão',
-                            asaas_id: paymentId
-                        })
-                } else {
-                    await serviceRoleClient
-                        .from('wallet_transactions')
-                        .update({ status: 'SUCCESS' })
-                        .eq('asaas_id', paymentId)
-                }
-
-                const { data: profile } = await serviceRoleClient
-                    .from('profiles')
-                    .select('balance')
-                    .eq('id', userId)
-                    .single()
-                
-                const currentBalance = Number(profile?.balance || 0)
-                const newBalance = currentBalance + amount
-                
-                await serviceRoleClient
-                    .from('profiles')
-                    .update({ balance: newBalance })
-                    .eq('id', userId)
-
-                console.log(`[Asaas Webhook] Balance updated successfully for user ${userId}`)
+            if (selectError) {
+                console.error('[Asaas Webhook] Error checking existing transaction:', selectError)
             }
 
-            return new Response(JSON.stringify({ received: true }), { 
-                headers: { 'Content-Type': 'application/json' },
-                status: 200 
-            })
+            if (existingTx?.status === 'SUCCESS') {
+                console.log(`[Asaas Webhook] Payment ${paymentId} already processed (SUCCESS). Skipping update.`)
+                return new Response(JSON.stringify({ received: true, alreadyProcessed: true }), { status: 200 })
+            }
+
+            // 3. Update Balance
+            console.log(`[Asaas Webhook] Processing ${event} for payment ${paymentId}. User: ${userId}, Amount: ${paymentValue}`)
+
+            // Get current balance
+            const { data: profile, error: pError } = await serviceRoleClient
+                .from('profiles')
+                .select('balance')
+                .eq('id', userId)
+                .single()
+
+            if (pError || !profile) {
+                throw new Error(`Profile not found for user ${userId}`)
+            }
+
+            const newBalance = (profile.balance || 0) + paymentValue
+
+            // Update profile balance
+            const { error: balanceError } = await serviceRoleClient
+                .from('profiles')
+                .update({ balance: newBalance })
+                .eq('id', userId)
+
+            if (balanceError) throw balanceError
+
+            // Upsert transaction record as SUCCESS
+            const { error: txError } = await serviceRoleClient
+                .from('wallet_transactions')
+                .upsert({
+                    user_id: userId,
+                    amount: paymentValue,
+                    type: 'deposit',
+                    status: 'SUCCESS',
+                    description: `Recarga via ${billingType} (Asaas: ${paymentId})`,
+                    asaas_id: paymentId,
+                    metadata: body
+                }, { onConflict: 'asaas_id' })
+
+            if (txError) {
+                console.error('[Asaas Webhook] Error updating transaction status:', txError)
+                // We don't throw here because balance was already updated
+            }
+
+            console.log(`[Asaas Webhook] Balance updated successfully for ${userId}. New balance: ${newBalance}`)
+            return new Response(JSON.stringify({ received: true, updated: true, newBalance }), { status: 200 })
         }
 
         return new Response(JSON.stringify({ received: true }), { status: 200 })
@@ -139,8 +159,8 @@ serve(async (req) => {
     if (body.action === 'create-payment') {
       const profile = await getProfile(userId)
       let asaasCustomerId = profile.asaas_customer_id
-      const customerName = body.name || profile.full_name || 'Cliente Cut House'
-      const customerEmail = body.email || user.email || `${userId}@cuthouse.com.br`
+      const customerName = body.name || profile.full_name || 'Cliente Easy Content'
+      const customerEmail = body.email || user.email || `${userId}@easycontent.com.br`
       
       if (asaasCustomerId) {
         const checkRes = await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
@@ -167,7 +187,7 @@ serve(async (req) => {
         billingType: body.billingType || 'PIX',
         value: amount,
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        description: body.description || 'Pagamento Cut House',
+        description: body.description || 'Pagamento Easy Content',
         externalReference: userId,
       }
 

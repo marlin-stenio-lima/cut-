@@ -43,7 +43,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
                     letterSpacing: '-0.02em',
                     color: 'inherit'
                 }}>
-                    CutHouse
+                    Easy Content
                 </span>
             )}
         </Link>

@@ -96,47 +96,57 @@ const ProjectFilesModal: React.FC<ProjectFilesModalProps> = ({ project, userRole
                         .from('project-files')
                         .getPublicUrl(uploadData.path);
 
-                    newFiles.push({
-                        name: file.name,
-                        url: publicUrl,
+                    await supabase
+                        .from('project_attachments')
+                        .insert({
+                            project_id: project.id,
+                            uploader_id: userId,
+                            file_name: file.name,
+                            storage_path: uploadData.path,
+                            file_size: file.size,
+                            file_type: file.type
+                        });
+
+                    const newFileEntry = { 
+                        name: file.name, 
+                        url: publicUrl, 
                         type: file.type,
-                        path: uploadData.path,
-                        description: '' // Default empty description
-                    } as any);
+                        size: file.size
+                    };
+                    
+                    const updatedFiles = [...(project.project_files || []), newFileEntry];
+                    
+                    await supabase
+                        .from('projects')
+                        .update({ project_files: updatedFiles })
+                        .eq('id', project.id);
                 }
             }
-
-            // Update project record
-            const { error: updateError } = await supabase
-                .from('projects')
-                .update({ project_files: newFiles })
-                .eq('id', project.id);
-
-            if (updateError) throw updateError;
-
             onRefresh();
         } catch (err: any) {
-            console.error('Error uploading file:', err);
-            setError(`Erro ao enviar arquivo: ${err.message}`);
+            console.error('Upload error:', err);
+            alert(`Erro no upload: ${err.message}`);
         } finally {
             setUploading(false);
         }
     };
 
+
+
     return (
         <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)',
-            zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            zIndex: 3000, padding: '20px'
         }} onClick={onClose}>
-            <div style={{
-                maxWidth: '700px', width: '100%', borderRadius: '24px', padding: '32px',
-                background: 'var(--bg-card)', border: '1px solid var(--glass-border)',
-                display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative',
-                boxShadow: '0 30px 60px rgba(0,0,0,0.4)', animation: 'fadeIn 0.3s ease-out'
+            <div className="glass" style={{
+                width: '100%', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto',
+                borderRadius: '32px', background: 'var(--bg-card)', border: '1px solid var(--glass-border)',
+                padding: '40px', position: 'relative'
             }} onClick={e => e.stopPropagation()}>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                     <div>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Central de Materiais</h2>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{project.title}</p>

@@ -67,7 +67,7 @@ const ProfileSelectionPage: React.FC = () => {
                     </div>
                 </div>
 
-                <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.5rem)', marginBottom: '16px', fontWeight: 800, letterSpacing: '-0.02em' }}>Como você quer usar o CutHouse?</h1>
+                <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.5rem)', marginBottom: '16px', fontWeight: 800, letterSpacing: '-0.02em' }}>Como você quer usar o Easy Content?</h1>
                 <p style={{ color: '#888888', marginBottom: '48px', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto 48px', lineHeight: 1.6 }}>
                     Escolha seu foco para personalizarmos sua área de trabalho e recomendarmos as melhores ferramentas.
                 </p>

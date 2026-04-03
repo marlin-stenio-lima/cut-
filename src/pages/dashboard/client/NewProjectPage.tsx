@@ -5,6 +5,8 @@ import StepProgress from '../../../components/dashboard/StepProgress';
 import { supabase } from '../../../services/supabase';
 import { useAuth } from '../../../context/AuthContext';
 
+// No IABriefingAssistant import needed
+
 const STEPS = ['Detalhes', 'Criatividades', 'Execução', 'Resumo'];
 
 interface ProjectData {
@@ -15,6 +17,7 @@ interface ProjectData {
     style: string;
     references: string;
     budget: string;
+    resolution: string;
     deadline: string;
     ryverLink: string;
     files: any[];
@@ -36,6 +39,7 @@ const NewProjectPage: React.FC = () => {
         style: '',
         references: '',
         budget: '',
+        resolution: '',
         deadline: '',
         ryverLink: '',
         files: []
@@ -62,6 +66,12 @@ const NewProjectPage: React.FC = () => {
         setIsSubmitting(true);
         setError(null);
 
+        if (!data.references.trim()) {
+            setError('Links de referência são obrigatórios para evitar erros na edição.');
+            setIsSubmitting(false);
+            return;
+        }
+
         try {
             const { error: insertDataError } = await supabase
                 .from('projects')
@@ -73,6 +83,7 @@ const NewProjectPage: React.FC = () => {
                     description: data.description,
                     style: data.style,
                     references_url: data.references,
+                    resolution: data.resolution,
                     budget: parseFloat(data.budget) || null,
                     deadline: data.deadline || null,
                     ryver_link: data.ryverLink,
@@ -135,9 +146,22 @@ const NewProjectPage: React.FC = () => {
                                         onChange={(e) => setData({ ...data, format: e.target.value })}
                                     >
                                         <option value="">Selecione...</option>
-                                        <option value="9x16">9:16 (Vertical)</option>
                                         <option value="16x9">16:9 (Horizontal)</option>
                                         <option value="1x1">1:1 (Quadrado)</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Resolução Desejada</label>
+                                    <select
+                                        className="auth-input"
+                                        style={{ backgroundColor: 'var(--bg-card)' }}
+                                        value={data.resolution}
+                                        onChange={(e) => setData({ ...data, resolution: e.target.value })}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        <option value="1080p">1080p (Full HD)</option>
+                                        <option value="4k">4K (Ultra HD)</option>
+                                        <option value="720p">720p (HD)</option>
                                     </select>
                                 </div>
                             </div>
@@ -177,7 +201,7 @@ const NewProjectPage: React.FC = () => {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Links de Referência (Opcional)</label>
+                                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}>Links de Referência (Obrigatório)</label>
                                 <input
                                     type="text"
                                     className="auth-input"
@@ -399,7 +423,7 @@ const NewProjectPage: React.FC = () => {
                             </div>
                         )}
                         <p style={{ marginTop: '20px', fontSize: '0.85rem', textAlign: 'center' }}>
-                            Ao confirmar, o projeto será listado para os melhores editores do Cut House.
+                            Ao confirmar, o projeto será listado para os melhores editores do Easy Content.
                         </p>
                     </div>
                 );

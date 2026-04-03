@@ -121,7 +121,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ file, onClose }) => {
                                         whiteSpace: 'nowrap',
                                         textAlign: 'center'
                                     }}>
-                                        CUT HOUSE<br/>PREVIEW
+                                        EASY CONTENT<br/>PREVIEW
                                     </div>
                                     <div style={{
                                         position: 'absolute',
@@ -136,7 +136,7 @@ const VideoModal: React.FC<VideoModalProps> = ({ file, onClose }) => {
                                         alignItems: 'center',
                                         gap: '6px'
                                     }}>
-                                        🔒 Protegido pela Cut House
+                                      Ao confirmar, o projeto será listado para os melhores editores do Easy Content.
                                     </div>
                                 </div>
                             )}

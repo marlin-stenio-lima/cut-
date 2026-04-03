@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Zap, Target, Star, Loader2, Clock, X, Send, CreditCard } from 'lucide-react'
+import { Zap, Target, Loader2, Clock, X, Send, CreditCard } from 'lucide-react'
 import { asaasService } from '../../services/asaas'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabase'
@@ -130,19 +130,31 @@ const EditorDashboard: React.FC = () => {
 
         setIsWithdrawing(true)
         try {
-            const res = await asaasService.requestWithdrawal(amount, pixKey, pixType)
-            if (res.success) {
-                alert(res.auto ? 'Saque realizado com sucesso! (PIX enviado)' : 'Solicitação enviada! Aguarde a aprovação do administrador.')
-                setShowWalletModal(false)
-                setWithdrawAmount('')
-                // Refresh balance and txs
-                const { data: profData } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
-                setBalance(Number(profData?.balance || 0))
-                const txs = await asaasService.getTransactions()
-                setTransactions(txs || [])
-            } else {
-                throw new Error(res.message || 'Erro ao processar saque')
-            }
+            const { error } = await supabase
+                .from('wallet_transactions')
+                .insert({
+                    user_id: user.id,
+                    amount: amount,
+                    type: 'WITHDRAWAL',
+                    status: 'AWAITING_APPROVAL',
+                    description: `Resgate via PIX (${pixType})`,
+                    metadata: {
+                        pixKey,
+                        pixKeyType: pixType
+                    }
+                })
+
+            if (error) throw error
+
+            alert('Solicitação enviada! Aguarde a aprovação do administrador.')
+            setShowWalletModal(false)
+            setWithdrawAmount('')
+            
+            // Refresh balance and txs
+            const { data: profData } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
+            setBalance(Number(profData?.balance || 0))
+            const { data: txs } = await supabase.from('wallet_transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+            setTransactions(txs || [])
         } catch (err: any) {
             alert(`Erro ao solicitar saque: ${err.message}`)
         } finally {
@@ -372,7 +384,6 @@ const EditorDashboard: React.FC = () => {
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '20px', color: 'var(--text-main)' }}>Minhas Métricas</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 {[
-                                    { label: 'Avaliação Média', value: '4.9', icon: <Star size={16} fill="#FFD700" color="#FFD700" /> },
                                     { label: 'Projetos Concluídos', value: myActiveProjects.filter(p => p.status === 'Concluído').length.toString(), icon: <Target size={16} className="accent-cyan" /> },
                                 ].map((m, i) => (
                                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -394,8 +405,8 @@ const EditorDashboard: React.FC = () => {
                                             <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{tx.type === 'TOPUP' ? 'Crédito' : 'Saque'}</div>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(tx.created_at).toLocaleDateString()}</div>
                                         </div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: tx.type === 'TOPUP' ? '#4ade80' : '#ef4444' }}>
-                                            {tx.type === 'TOPUP' ? '+' : '-'} R$ {tx.amount}
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: tx.type === 'deposit' || tx.type === 'TOPUP' || tx.type === 'PAYMENT' ? '#4ade80' : '#ef4444' }}>
+                                            {tx.type === 'deposit' || tx.type === 'TOPUP' || tx.type === 'PAYMENT' ? '+' : '-'} R$ {tx.amount}
                                         </div>
                                     </div>
                                 ))}
@@ -519,9 +530,10 @@ const EditorDashboard: React.FC = () => {
                                         style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', outline: 'none' }}
                                     >
                                         <option value="CPF">CPF</option>
+                                        <option value="CNPJ">CNPJ</option>
+                                        <option value="CELULAR">Celular</option>
                                         <option value="EMAIL">E-mail</option>
-                                        <option value="PHONE">Celular</option>
-                                        <option value="RANDOM">Chave Aleatória (EVP)</option>
+                                        <option value="EVP">Chave Aleatória (EVP)</option>
                                     </select>
                                 </div>
 
