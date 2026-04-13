@@ -206,16 +206,20 @@ serve(async (req) => {
       const paymentId = paymentData.id
       const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(paymentData.status)
 
-      await serviceRoleClient
+      const { error: insertError } = await serviceRoleClient
         .from('wallet_transactions')
         .insert({
             user_id: userId,
             amount: amount,
-            type: 'deposit',
+            type: 'TOPUP',
             status: isPaid ? 'SUCCESS' : 'PENDING',
             description: 'Recarga de Saldo',
             asaas_id: paymentId
         })
+        
+      if (insertError) {
+          throw new Error('Erro ao salvar transação: ' + insertError.message)
+      }
 
       if (paymentData.billingType === 'PIX') {
         const pixRes = await fetch(`${ASAAS_API_URL}/payments/${paymentId}/pixQrCode`, {
@@ -237,6 +241,32 @@ serve(async (req) => {
       if (data.errors) throw new Error(data.errors[0].description)
       
       const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(data.status)
+      
+      // Proactive Idempotent Update (Fallback in case webhook is slow)
+      if (isPaid) {
+          const { data: existingTx } = await serviceRoleClient
+              .from('wallet_transactions')
+              .select('status, amount')
+              .eq('asaas_id', data.id)
+              .maybeSingle()
+              
+          if (existingTx && existingTx.status !== 'SUCCESS') {
+               const { data: profile } = await serviceRoleClient
+                   .from('profiles')
+                   .select('balance')
+                   .eq('id', userId)
+                   .single()
+               
+               if (profile) {
+                   await serviceRoleClient.from('profiles').update({ balance: (profile.balance || 0) + Number(data.value) }).eq('id', userId)
+                   await serviceRoleClient.from('wallet_transactions').update({
+                       status: 'SUCCESS',
+                       description: `Recarga via ${data.billingType} (Asaas: ${data.id})`,
+                   }).eq('asaas_id', data.id)
+               }
+          }
+      }
+
       return new Response(JSON.stringify({ status: data.status, isPaid, payment: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     }
 
@@ -261,7 +291,7 @@ serve(async (req) => {
       const { error: txError } = await serviceRoleClient.from('wallet_transactions').insert({
           user_id: userId,
           amount: amount,
-          type: 'withdrawal',
+          type: 'WITHDRAWAL',
           status: 'PENDING',
           description: 'Solicitação de Saque do Editor',
           metadata: { pixKey: body.pixKey, pixKeyType: body.pixKeyType }
