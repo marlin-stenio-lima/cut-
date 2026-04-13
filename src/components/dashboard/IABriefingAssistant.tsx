@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Bot, Sparkles, ArrowRight, ArrowLeft, CheckCircle2, DollarSign, Clock, Layout } from 'lucide-react';
+import { X, Bot, Sparkles, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 interface IABriefingAssistantProps {
     onComplete: (data: any) => void;
@@ -56,9 +56,9 @@ const IABriefingAssistant: React.FC<IABriefingAssistantProps> = ({ onComplete, o
         
         if (!goal || !duration || !complexity) return 200;
 
-        const base = goal.basePrice || 100;
-        const durMult = duration.multiplier || 1;
-        const compMult = complexity.multiplier || 1;
+        const base = (goal as any).basePrice || 100;
+        const durMult = (duration as any).multiplier || 1;
+        const compMult = (complexity as any).multiplier || 1;
         
         return Math.round(base * durMult * compMult);
     };

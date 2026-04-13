@@ -111,18 +111,15 @@ serve(async (req) => {
 
             if (balanceError) throw balanceError
 
-            // Upsert transaction record as SUCCESS
+            // Update transaction record as SUCCESS
             const { error: txError } = await serviceRoleClient
                 .from('wallet_transactions')
-                .upsert({
-                    user_id: userId,
-                    amount: paymentValue,
-                    type: 'deposit',
+                .update({
                     status: 'SUCCESS',
                     description: `Recarga via ${billingType} (Asaas: ${paymentId})`,
-                    asaas_id: paymentId,
                     metadata: body
-                }, { onConflict: 'asaas_id' })
+                })
+                .eq('asaas_id', paymentId)
 
             if (txError) {
                 console.error('[Asaas Webhook] Error updating transaction status:', txError)
@@ -229,6 +226,98 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ status: paymentData.status, isPaid, payment: paymentData }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    if (body.action === 'get-payment-status') {
+      const res = await fetch(`${ASAAS_API_URL}/payments/${body.paymentId}`, {
+        method: 'GET',
+        headers: { 'access_token': ASAAS_API_KEY }
+      })
+      const data = await res.json()
+      if (data.errors) throw new Error(data.errors[0].description)
+      
+      const isPaid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(data.status)
+      return new Response(JSON.stringify({ status: data.status, isPaid, payment: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    if (body.action === 'admin-get-balance') {
+      const profile = await getProfile(userId)
+      if (profile.role !== 'admin') throw new Error("Acesso negado: Requer permissões de administrador.")
+      
+      const res = await fetch(`${ASAAS_API_URL}/finance/balance`, {
+          method: 'GET',
+          headers: { 'access_token': ASAAS_API_KEY }
+      })
+      const data = await res.json()
+      
+      return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    if (body.action === 'withdraw') {
+      const profile = await getProfile(userId)
+      const amount = Number(body.amount)
+      if (amount <= 0 || (profile.balance || 0) < amount) throw new Error("Saldo insuficiente")
+      
+      const { error: txError } = await serviceRoleClient.from('wallet_transactions').insert({
+          user_id: userId,
+          amount: amount,
+          type: 'withdrawal',
+          status: 'PENDING',
+          description: 'Solicitação de Saque do Editor',
+          metadata: { pixKey: body.pixKey, pixKeyType: body.pixKeyType }
+      })
+      if (txError) throw txError
+      
+      await serviceRoleClient.from('profiles').update({ balance: profile.balance - amount, frozen_balance: (profile.frozen_balance || 0) + amount }).eq('id', userId)
+
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    if (body.action === 'admin-approve-withdrawal') {
+      const adminProfile = await getProfile(userId)
+      if (adminProfile.role !== 'admin') throw new Error("Acesso negado")
+      
+      const { data: tx, error: txError } = await serviceRoleClient.from('wallet_transactions').select('*').eq('id', body.txId).single()
+      if (txError || !tx || tx.status !== 'PENDING') throw new Error("Transação inválida")
+      
+      const res = await fetch(`${ASAAS_API_URL}/transfers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
+          body: JSON.stringify({
+              value: tx.amount,
+              pixAddressKey: tx.metadata?.pixKey,
+              pixAddressKeyType: tx.metadata?.pixKeyType || 'EVP',
+              description: `Pagamento de Edição - Easy Content`
+          })
+      })
+      const data = await res.json()
+      if (data.errors) throw new Error(`Erro ao transferir no Asaas: ${data.errors[0].description}`)
+      
+      await serviceRoleClient.from('wallet_transactions').update({ status: 'SUCCESS', asaas_id: data.id }).eq('id', tx.id)
+      
+      const { data: profile } = await serviceRoleClient.from('profiles').select('frozen_balance').eq('id', tx.user_id).single()
+      if (profile) {
+          await serviceRoleClient.from('profiles').update({ frozen_balance: (profile.frozen_balance || 0) - tx.amount }).eq('id', tx.user_id)
+      }
+      
+      return new Response(JSON.stringify({ success: true, asaasTransfer: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    if (body.action === 'admin-reject-withdrawal') {
+      const adminProfile = await getProfile(userId)
+      if (adminProfile.role !== 'admin') throw new Error("Acesso negado")
+      
+      const { data: tx, error: txError } = await serviceRoleClient.from('wallet_transactions').select('*').eq('id', body.txId).single()
+      if (txError || !tx || tx.status !== 'PENDING') throw new Error("Transação inválida")
+      
+      await serviceRoleClient.from('wallet_transactions').update({ status: 'FAILED', description: `Rejeitado: ${body.reason}` }).eq('id', tx.id)
+      
+      const { data: profile } = await serviceRoleClient.from('profiles').select('balance, frozen_balance').eq('id', tx.user_id).single()
+      if (profile) {
+          await serviceRoleClient.from('profiles').update({ balance: (profile.balance || 0) + tx.amount, frozen_balance: (profile.frozen_balance || 0) - tx.amount }).eq('id', tx.user_id)
+      }
+      
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     }
 
     throw new Error(`Ação inválida: ${body.action}`)

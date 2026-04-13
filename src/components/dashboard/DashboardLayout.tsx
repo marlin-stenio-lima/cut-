@@ -15,7 +15,9 @@ import {
     Moon,
     Shield,
     Users,
-    Wallet
+    Wallet,
+    TrendingUp,
+    Filter
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -52,6 +54,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
         // Admin Navigation
         { icon: <LayoutDashboard size={20} />, label: 'Visão Geral', path: '/dashboard' },
         { icon: <Shield size={20} />, label: 'Administração', path: '/dashboard/admin' },
+        { icon: <Users size={20} />, label: 'Base Clientes', path: '/dashboard/admin/clients' },
+        { icon: <TrendingUp size={20} />, label: 'Base Editores', path: '/dashboard/admin/editors' },
+        { icon: <Filter size={20} />, label: 'CRM Projetos', path: '/dashboard/admin/crm' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
     ]
 

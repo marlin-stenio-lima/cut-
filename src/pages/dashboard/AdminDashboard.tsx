@@ -1,464 +1,1146 @@
 import React, { useState, useEffect } from 'react'
-import { 
-    Shield, 
-    Clock, 
-    CheckCircle2, 
-    Users, 
-    TrendingUp, 
-    Search,
-    Filter,
-    ArrowUpRight,
-    Loader2,
-    Check,
-    X,
-    Settings,
-    DollarSign,
-    CreditCard,
-    FileText,
-    Eye,
-    MapPin,
-    Calendar,
-    Briefcase,
-    ExternalLink
+import { useLocation } from 'react-router-dom'
+import {
+    Shield, Users, TrendingUp, Loader2, X,
+    DollarSign, Eye, Briefcase, ExternalLink, Search, Plus,
+    CheckCircle, RotateCcw, Phone, Mail, MapPin,
+    MessageSquare, Calendar, Star, Code, Clock, Trash2, MoreHorizontal
 } from 'lucide-react'
 import { asaasService } from '../../services/asaas'
 import { supabase } from '../../services/supabase'
+import KanbanBoard from '../../components/crm/KanbanBoard'
 
 const AdminDashboard: React.FC = () => {
+    const location = useLocation()
     const [loading, setLoading] = useState(true)
     const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([])
-    const [autoPayoutEnabled, setAutoPayoutEnabled] = useState(false)
-    const [stats, setStats] = useState({
-        totalBalance: 0,
-        pendingTotal: 0,
-        activeEditors: 0
-    })
-
-    // UI State
+    const [systemBalance, setSystemBalance] = useState<number>(0) // Real-Time Asaas Balance
+    const [stats, setStats] = useState({ pendingTotal: 0, activeEditors: 0 })
     const [showRejectModal, setShowRejectModal] = useState<string | null>(null)
     const [rejectionReason, setRejectionReason] = useState('')
-    const [isActioning, setIsActioning] = useState<string | null>(null)
     const [commissionPercentage, setCommissionPercentage] = useState(10)
     const [isUpdatingFee, setIsUpdatingFee] = useState(false)
-    const [pendingProjectPayouts, setPendingProjectPayouts] = useState<any[]>([])
     const [pendingEditors, setPendingEditors] = useState<any[]>([])
-    const [activeTab, setActiveTab] = useState<'finance' | 'editors'>('finance')
-    const [viewingEditor, setViewingEditor] = useState<any | null>(null)
+    const [allClients, setAllClients] = useState<any[]>([])
+    const [allEditors, setAllEditors] = useState<any[]>([])
+    const [activeTab, setActiveTab] = useState<string>('finance')
+    const [viewingContact, setViewingContact] = useState<any | null>(null)
     const [showEditorRejectModal, setShowEditorRejectModal] = useState<string | null>(null)
     const [editorRejectionReason, setEditorRejectionReason] = useState('')
+    const [editorUrls, setEditorUrls] = useState<{ identity: string, face: string }>({ identity: '', face: '' })
+    const [leads, setLeads] = useState<any[]>([])
+    const [leadSearch, setLeadSearch] = useState('')
+    const [editorSearch, setEditorSearch] = useState('')
+    const [selectedEditors, setSelectedEditors] = useState<string[]>([])
+    const [clientSearch, setClientSearch] = useState('')
+    const [selectedClients, setSelectedClients] = useState<string[]>([])
+    const [showLeadModal, setShowLeadModal] = useState(false)
+    const [editingLead, setEditingLead] = useState<any | null>(null)
+    const [leadForm, setLeadForm] = useState({ full_name: '', email: '', whatsapp: '', status: 'Novo', source: '', notes: '' })
+    const [overviewStats, setOverviewStats] = useState({ totalRevenue: 0, completedProjects: 0, statusCounts: {} as Record<string, number>, totalProjects: 0 })
 
+    useEffect(() => { loadAdminData() }, [])
     useEffect(() => {
-        loadAdminData()
-    }, [])
+        if (location.pathname.includes('/leads')) setActiveTab('leads')
+        else if (location.pathname.includes('/crm')) setActiveTab('crm')
+        else if (location.pathname.includes('/clients')) setActiveTab('clients')
+        else if (location.pathname.includes('/editors')) setActiveTab('editors')
+        else if (location.pathname === '/dashboard/admin') setActiveTab('finance')
+        else if (location.pathname === '/dashboard') setActiveTab('overview')
+    }, [location.pathname])
+    useEffect(() => {
+        if (viewingContact) fetchSignedUrls(viewingContact)
+        else setEditorUrls({ identity: '', face: '' })
+    }, [viewingContact])
+
+    const fetchSignedUrls = async (editor: any) => {
+        try {
+            const urls = { identity: '', face: '' }
+            if (editor.identity_doc_url) {
+                const { data } = await supabase.storage.from('editor-docs').createSignedUrl(editor.identity_doc_url, 3600)
+                if (data) urls.identity = data.signedUrl
+            }
+            if (editor.face_photo_url) {
+                const { data } = await supabase.storage.from('editor-docs').createSignedUrl(editor.face_photo_url, 3600)
+                if (data) urls.face = data.signedUrl
+            }
+            setEditorUrls(urls)
+        } catch (err) { console.error(err) }
+    }
 
     const loadAdminData = async () => {
-        console.log('[AdminDashboard] Loading analytical data...')
         setLoading(true)
         try {
-            // 1. Fetch Platform Settings
-            const { data: settings } = await supabase.from('platform_settings').select('*').eq('id', 'global').single()
-            if (settings) {
-                setAutoPayoutEnabled(settings.auto_payout_enabled || false)
-                setCommissionPercentage(settings.commission_percentage || 10)
+            // Fetch profiles + email via auth join (requires a view or RPC)
+            // We use the raw select and rely on email being stored at signup via trigger
+            const [withDrRes, editors, configs, profiles, leadsData, projectsReq, txsReq] = await Promise.all([
+                supabase.from('wallet_transactions').select('*, profiles:user_id(*)').eq('type', 'withdrawal').eq('status', 'PENDING'),
+                supabase.from('profiles').select('*').eq('role', 'editor').eq('onboarding_status', 'pending'),
+                supabase.from('system_configs').select('*'),
+                supabase.from('profiles').select('*, email:contact_email').order('created_at', { ascending: false }),
+                supabase.from('leads').select('*').order('created_at', { ascending: false }),
+                supabase.from('projects').select('status, is_pool'),
+                supabase.from('wallet_transactions').select('amount').eq('type', 'deposit').eq('status', 'SUCCESS')
+            ])
+
+            const withDr: any[] = withDrRes.data || [];
+
+            if (projectsReq.data && txsReq.data) {
+                const totalRev = txsReq.data.reduce((a: number, c: any) => a + (c.amount || 0), 0)
+                const completed = projectsReq.data.filter((p: any) => p.status === 'Concluído').length
+                const statusCounts: Record<string, number> = {};
+                projectsReq.data.forEach((p: any) => {
+                    const st = p.status || 'Novo projeto';
+                    statusCounts[st] = (statusCounts[st] || 0) + 1;
+                });
+
+                setOverviewStats({
+                    totalRevenue: totalRev,
+                    completedProjects: completed,
+                    statusCounts,
+                    totalProjects: projectsReq.data.length || 1
+                })
             }
 
-            // 2. Fetch Projects Awaiting Payout
-            const { data: projectsData } = await supabase
-                .from('projects')
-                .select('*, client:client_id(full_name), editor:editor_id(full_name)')
-                .eq('status', 'Aguardando Pagamento')
-            
-            setPendingProjectPayouts(projectsData || [])
-
-            // 3. Fetch Pending Withdrawals with Profile info
-            const { data: txs } = await supabase
-                .from('wallet_transactions')
-                .select(`
-                    *,
-                    profiles:user_id (full_name, email)
-                `)
-                .eq('status', 'AWAITING_APPROVAL')
-                .order('created_at', { ascending: false })
-            
-            setPendingWithdrawals(txs || [])
-
-            // 4. Stats (Quick Overview)
-            const { data: profiles } = await supabase.from('profiles').select('balance, role, onboarding_status')
-            const totalBal = profiles?.reduce((acc, p) => acc + Number(p.balance || 0), 0) || 0
-            const pendingTotal = txs?.reduce((acc, t) => acc + Number(t.amount || 0), 0) || 0
-
-            setStats({
-                totalBalance: totalBal,
-                pendingTotal: pendingTotal,
-                activeEditors: profiles?.filter(p => p.role === 'editor' && p.onboarding_status === 'approved').length || 0
-            })
-
-            // 5. Fetch Pending Editors
-            const { data: candidates } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('onboarding_status', 'pending')
-                .order('updated_at', { ascending: false })
-            
-            setPendingEditors(candidates || [])
-
-        } catch (err: any) {
-            console.error('[AdminDashboard] Critical Error:', err)
-        } finally {
-            console.log('[AdminDashboard] Loading finished.')
-            setLoading(false)
-        }
-    }
-
-    const handleToggleAuto = async () => {
-        const newValue = !autoPayoutEnabled
-        try {
-            await asaasService.toggleAutoPayout(newValue)
-            setAutoPayoutEnabled(newValue)
-        } catch (err) {
-            alert('Erro ao alterar configuração')
-        }
-    }
-
-    const handleApprove = async (txId: string) => {
-        if (!confirm('Deseja realmente aprovar este saque?')) return
-        setIsActioning(txId)
-        try {
-            const { data: tx } = await supabase.from('wallet_transactions').select('*').eq('id', txId).single()
-            if (!tx) throw new Error('Transação não encontrada')
-
-            const { data: profile } = await supabase.from('profiles').select('balance').eq('id', tx.user_id).single()
-            const currentBalance = Number(profile?.balance || 0)
-
-            if (currentBalance < tx.amount) {
-                throw new Error('Saldo insuficiente no perfil para este saque.')
+            try {
+                const asaasBal = await asaasService.getSystemBalance()
+                if (asaasBal && typeof asaasBal.balance === 'number') {
+                    setSystemBalance(asaasBal.balance)
+                }
+            } catch (e: any) {
+                console.warn('[AdminDashboard] Failed to fetch Asaas Balance', e)
             }
 
-            await supabase.from('profiles').update({ balance: currentBalance - tx.amount }).eq('id', tx.user_id)
-            await supabase.from('wallet_transactions').update({ status: 'SUCCESS' }).eq('id', txId)
+            console.log('[AdminDashboard] profiles raw:', profiles.data, profiles.error)
 
-            alert('Saque aprovado com sucesso!')
-            loadAdminData()
-        } catch (err: any) {
-            alert(`Erro ao aprovar: ${err.message}`)
-        } finally {
-            setIsActioning(null)
-        }
-    }
-
-    const handleReject = async () => {
-        if (!showRejectModal || !rejectionReason) return
-        setIsActioning(showRejectModal)
-        try {
-            await supabase.from('wallet_transactions').update({ 
-                status: 'FAILED',
-                description: `Saque Recusado: ${rejectionReason}`
-            }).eq('id', showRejectModal)
-            
-            alert('Saque recusado.')
-            setShowRejectModal(null)
-            setRejectionReason('')
-            loadAdminData()
-        } catch (err: any) {
-            alert(`Erro ao recusar: ${err.message}`)
-        } finally {
-            setIsActioning(null)
-        }
+            if (withDr) setPendingWithdrawals(withDr)
+            if (editors.data) setPendingEditors(editors.data)
+            if (configs.data) {
+                const fee = configs.data.find((c: any) => c.key === 'platform_commission')
+                if (fee) setCommissionPercentage(fee.value)
+            }
+            if (leadsData.data) {
+                setLeads(leadsData.data)
+            }
+            if (profiles.data && profiles.data.length > 0) {
+                const clients_profiles = profiles.data.filter((p: any) => p.role === 'client' || (!p.role && p.id !== profiles.data?.find((a: any) => a.role === 'admin')?.id))
+                const editorsList = profiles.data.filter((p: any) => p.role === 'editor')
+                console.log('[AdminDashboard] all roles:', profiles.data.map((p: any) => ({ name: p.full_name, role: p.role })))
+                
+                // Merge leads that are in the system so they appear in Base de Clientes
+                const mappedLeads = (leadsData.data || []).map((l: any) => ({
+                    id: l.id,
+                    full_name: l.full_name,
+                    email: l.email,
+                    whatsapp: l.whatsapp,
+                    created_at: l.created_at,
+                    role: 'client',
+                    is_lead: true,
+                    status: l.status
+                }));
+                
+                setAllClients([...clients_profiles, ...mappedLeads])
+                setAllEditors(editorsList)
+                setStats({
+                    pendingTotal: withDr?.reduce((a: number, c: any) => a + (c.value || 0), 0) || 0,
+                    activeEditors: editorsList.filter((p: any) => p.onboarding_status === 'approved').length
+                })
+            } else {
+                console.warn('[AdminDashboard] No profiles returned. Error:', profiles.error)
+                // Just set leads if profiles fail
+                if (leadsData.data) {
+                    setAllClients(leadsData.data.map((l: any) => ({...l, is_lead: true})))
+                }
+            }
+        } catch (err) { console.error('[AdminDashboard] loadAdminData error:', err) } finally { setLoading(false) }
     }
 
     const handleUpdateFee = async () => {
         setIsUpdatingFee(true)
         try {
-            await supabase.from('platform_settings').update({ commission_percentage: commissionPercentage }).eq('id', 'global')
-            alert('Taxa da plataforma atualizada!')
-        } catch (err: any) {
-            alert(`Erro: ${err.message}`)
-        } finally {
-            setIsUpdatingFee(false)
-        }
+            await supabase.from('system_configs').upsert({ key: 'platform_commission', value: commissionPercentage }, { onConflict: 'key' })
+        } catch (err) { alert('Erro ao atualizar') } finally { setIsUpdatingFee(false) }
     }
-
-    const handleReleaseProjectPayout = async (project: any) => {
-        if (!confirm(`Deseja liberar o pagamento de R$ ${project.final_price}?`)) return
-        setIsActioning(project.id)
-        try {
-            const taxAmount = (Number(project.final_price) * commissionPercentage) / 100
-            const netAmount = Number(project.final_price) - taxAmount
-
-            await supabase.from('projects').update({ status: 'Concluído' }).eq('id', project.id)
-            
-            const { data: clientProfile } = await supabase.from('profiles').select('frozen_balance').eq('id', project.client_id).single()
-            await supabase.from('profiles').update({ 
-                frozen_balance: Number(clientProfile?.frozen_balance || 0) - Number(project.final_price) 
-            }).eq('id', project.client_id)
-
-            const { data: editorProfile } = await supabase.from('profiles').select('balance').eq('id', project.editor_id).single()
-            await supabase.from('profiles').update({ 
-                balance: Number(editorProfile?.balance || 0) + netAmount 
-            }).eq('id', project.editor_id)
-
-            await supabase.from('wallet_transactions').insert({
-                user_id: project.editor_id,
-                amount: netAmount,
-                type: 'PAYMENT',
-                status: 'SUCCESS',
-                description: `Pagamento: ${project.title}`
-            })
-
-            alert('Pagamento liberado!')
-            loadAdminData()
-        } catch (err: any) {
-            alert(`Erro: ${err.message}`)
-        } finally {
-            setIsActioning(null)
-        }
+    const handleApproveWithdrawal = async (id: string, amount: number) => {
+        if (!confirm(`⚠️ ALERTA DE SEGURANÇA - INTEGRAÇÃO ASAAS ⚠️\n\nVocê está prestes a aprovar uma transferência real de R$ ${amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} via Asaas. O dinheiro sairá da sua conta instantaneamente para o usuário.\n\nTem certeza que deseja prosseguir com o pagamento PIX definitivo?`)) return
+        try { await asaasService.approveWithdrawal(id); loadAdminData(); alert('Transferência aprovada com sucesso no Asaas!') } catch { alert('Erro na aprovação via Asaas.') }
     }
-
-    const handleApproveEditor = async (editorId: string) => {
-        setIsActioning(editorId)
-        try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ onboarding_status: 'approved', role: 'editor' })
-                .eq('id', editorId)
-            
-            if (error) throw error
-            alert('Editor aprovado!')
-            setViewingEditor(null)
-            loadAdminData()
-        } catch (err: any) {
-            alert(`Erro: ${err.message}`)
-        } finally {
-            setIsActioning(null)
-        }
+    const handleReject = async () => {
+        if (!showRejectModal || !rejectionReason) return
+        try { await asaasService.rejectWithdrawal(showRejectModal, rejectionReason); setShowRejectModal(null); setRejectionReason(''); loadAdminData() } catch { alert('Erro') }
     }
-
+    const handleApproveEditor = async (id: string) => {
+        try { await supabase.from('profiles').update({ onboarding_status: 'approved' }).eq('id', id); loadAdminData() } catch { alert('Erro') }
+    }
     const handleRejectEditor = async () => {
         if (!showEditorRejectModal || !editorRejectionReason) return
-        setIsActioning(showEditorRejectModal)
         try {
-            await supabase.from('profiles').update({ 
-                onboarding_status: 'rejected',
-                onboarding_rejection_reason: editorRejectionReason
-            }).eq('id', showEditorRejectModal)
-            
-            alert('Candidato recusado.')
-            setShowEditorRejectModal(null)
-            setEditorRejectionReason('')
-            setViewingEditor(null)
-            loadAdminData()
-        } catch (err: any) {
-            alert(`Erro: ${err.message}`)
-        } finally {
-            setIsActioning(null)
-        }
+            await supabase.from('profiles').update({ onboarding_status: 'rejected', rejection_reason: editorRejectionReason }).eq('id', showEditorRejectModal)
+            setShowEditorRejectModal(null); setEditorRejectionReason(''); loadAdminData()
+        } catch { alert('Erro') }
     }
+    const handleSaveLead = async () => {
+        try {
+            if (editingLead) await supabase.from('leads').update(leadForm).eq('id', editingLead.id)
+            else await supabase.from('leads').insert([leadForm])
+            setShowLeadModal(false); setEditingLead(null)
+            setLeadForm({ full_name: '', email: '', whatsapp: '', status: 'Novo', source: '', notes: '' })
+            loadAdminData()
+        } catch { alert('Erro ao salvar') }
+    }
+    const handleDeleteLead = async (id: string) => {
+        if (!confirm('Excluir?')) return
+        try { await supabase.from('leads').delete().eq('id', id); loadAdminData() } catch { alert('Erro') }
+    }
+
+    const filteredLeads = leads.filter(l =>
+        l.full_name?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+        l.email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+        l.whatsapp?.includes(leadSearch)
+    )
 
     if (loading && !pendingWithdrawals.length && !pendingEditors.length) {
         return (
-            <div style={{ height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Loader2 className="animate-spin" color="var(--primary)" size={48} />
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary)' }} />
             </div>
         )
     }
 
     return (
-        <div style={{ padding: '32px', color: 'var(--text-main)', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
-                <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                        <Shield size={18} color="var(--primary)" />
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>ADMINISTRAÇÃO</span>
-                    </div>
-                    <h1 style={{ fontSize: '2.5rem', fontWeight: 800 }}>Fila de Análise</h1>
-                </div>
+        <div className="h-full overflow-y-auto" style={{ padding: '32px 40px', color: 'var(--text-main)', background: 'var(--bg-deep)' }}>
+            <div style={{ maxWidth: 1600, margin: '0 auto' }}>
 
-                <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '6px', borderRadius: '16px' }}>
-                    <button 
-                        onClick={() => setActiveTab('finance')}
-                        style={{ padding: '10px 20px', borderRadius: '12px', background: activeTab === 'finance' ? 'var(--primary)' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}
-                    >
-                        Financeiro
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('editors')}
-                        style={{ padding: '10px 20px', borderRadius: '12px', background: activeTab === 'editors' ? 'var(--primary)' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative' }}
-                    >
-                        Candidatos
-                        {pendingEditors.length > 0 && (
-                            <span style={{ position: 'absolute', top: '-5px', right: '-5px', width: '20px', height: '20px', background: '#ef4444', borderRadius: '50%', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingEditors.length}</span>
+
+
+                {/* ─── Overview (Visão Geral) ─── */}
+                {activeTab === 'overview' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        <div>
+                            <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)', marginBottom: '8px' }}>Visão Geral</h2>
+                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Métricas detalhadas de performance da plataforma.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                            {[
+                                { label: 'Receita Total', value: `R$ ${overviewStats.totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, icon: TrendingUp, color: 'var(--primary)' },
+                                { label: 'Projetos Concluídos', value: overviewStats.completedProjects.toString(), icon: Briefcase, color: 'var(--secondary)' },
+                                { label: 'Clientes Ativos', value: allClients.length, icon: Users, color: '#10b981' },
+                                { label: 'Editores Ativos', value: stats.activeEditors, icon: Star, color: '#f59e0b' },
+                            ].map((kpi, idx) => (
+                                <div key={idx} style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${kpi.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color }}>
+                                            <kpi.icon size={20} />
+                                        </div>
+                                        <div style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: '11px', fontWeight: 'bold' }}>+12% este mês</div>
+                                    </div>
+                                    <div>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{kpi.label}</p>
+                                        <p style={{ color: 'var(--text-main)', fontSize: '28px', fontWeight: '800' }}>{kpi.value}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Fake Charts Block for Glow Up */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                             <div className="lg:col-span-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '32px' }}>
+                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Fluxo de Caixa Anual</h3>
+                                 <div style={{ height: '300px', width: '100%', background: 'linear-gradient(180deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%)', borderBottom: '2px solid var(--primary)', position: 'relative', borderRadius: '8px' }}>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '10%', width: '40px', height: '40%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '25%', width: '40px', height: '60%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '40%', width: '40px', height: '55%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '55%', width: '40px', height: '80%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '70%', width: '40px', height: '95%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                    <div style={{ position: 'absolute', bottom: '0', left: '85%', width: '40px', height: '70%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
+                                 </div>
+                             </div>
+                             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '32px' }}>
+                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Status dos Projetos</h3>
+                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '40px' }}>
+                                     {Object.entries(overviewStats.statusCounts || {}).map(([status, count], i) => {
+                                         const pct = Math.round(((count as number) / Math.max(overviewStats.totalProjects || 1, 1)) * 100);
+                                         const colors = ['var(--primary)', 'var(--secondary)', '#a855f7', '#ec4899', '#f59e0b', '#10b981'];
+                                         const color = colors[i % colors.length];
+                                         return (
+                                           <div key={status}>
+                                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>{status}</span>
+                                                  <span style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: 'bold' }}>{pct}% ({count})</span>
+                                               </div>
+                                               <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                   <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }}></div>
+                                               </div>
+                                           </div>
+                                         )
+                                     })}
+                                     {(!overviewStats.statusCounts || Object.keys(overviewStats.statusCounts).length === 0) && (
+                                         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum projeto encontrado.</p>
+                                     )}
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── Finance Strategy (Asaas) ─── */}
+                {activeTab === 'finance' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-main)', marginBottom: '8px' }}>
+                                    <Shield size={24} style={{ color: '#10b981' }} />
+                                    Administração Financeira (Asaas)
+                                </h2>
+                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Gerenciamento de caixa e aprovação instantânea de transferências.</p>
+                            </div>
+                            <button onClick={loadAdminData} className="rounded-xl px-4 py-2 transition-all hover:bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.05)]" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                                <RotateCcw size={14} /> Atualizar Agora
+                            </button>
+                        </div>
+                        
+                        {/* Caixa Tempo Real */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1), transparent)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '24px', padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', right: '-20px', top: '-20px', opacity: 0.05, transform: 'scale(2.5)' }}><DollarSign size={200} /></div>
+                                <p style={{ color: '#10b981', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span></span>
+                                    Saldo Em Conta Asaas (Real-time)
+                                </p>
+                                <p style={{ color: 'var(--text-main)', fontSize: '48px', fontWeight: '900', letterSpacing: '-1px' }}>
+                                    R$ {systemBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '12px' }}>Dinheiro líquido disponível para transferências e saques dos editores.</p>
+                            </div>
+
+                            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajuste de Taxa / Comissão</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{ flex: 1, position: 'relative' }}>
+                                            <input
+                                                type="number"
+                                                value={commissionPercentage}
+                                                onChange={e => setCommissionPercentage(Number(e.target.value))}
+                                                className="w-full text-lg font-bold outline-none"
+                                                style={{ background: 'var(--input-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', padding: '16px 20px', color: 'var(--text-main)' }}
+                                            />
+                                            <span style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 'bold' }}>%</span>
+                                        </div>
+                                        <button onClick={handleUpdateFee} disabled={isUpdatingFee} className="transition-all hover:opacity-80" style={{ background: 'var(--primary)', color: '#fff', borderRadius: '16px', padding: '16px 24px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
+                                            {isUpdatingFee ? <Loader2 size={20} className="animate-spin" /> : 'Salvar'}
+                                        </button>
+                                    </div>
+                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>Será retida automaticamente nos projetos</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Approval Table */}
+                        <div className="rounded-3xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div>
+                                    <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '4px' }}>Aprovação de Saques</h3>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Estas solicitações farão transferências REAIS (Pix/TED) pela API do Asaas ao serem aprovadas.</p>
+                                </div>
+                                <div style={{ padding: '8px 16px', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', inlineSize: 'fit-content', borderRadius: '12px', fontSize: '14px', fontWeight: 'bold' }}>
+                                    {pendingWithdrawals.length} pendentes
+                                </div>
+                            </div>
+                            
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '800px' }}>
+                                    <thead style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--glass-border)' }}>
+                                        <tr>
+                                            <th style={{ padding: '16px 32px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Usuário / Data</th>
+                                            <th style={{ padding: '16px 32px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total na Carteira</th>
+                                            <th style={{ padding: '16px 32px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Saque Solicitado</th>
+                                            <th style={{ padding: '16px 32px', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', textAlign: 'right' }}>Gatilho Asaas (Real-Time)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingWithdrawals.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} style={{ padding: '80px', textAlign: 'center' }}>
+                                                    <CheckCircle size={40} style={{ margin: '0 auto 16px auto', color: '#10b981', opacity: 0.3 }} />
+                                                    <p style={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '16px' }}>Nenhuma solicitação pendente</p>
+                                                    <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>A caixa de saques está limpa.</p>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            pendingWithdrawals.map(w => (
+                                                <tr key={w.id} style={{ borderBottom: '1px solid var(--glass-border)', transition: 'background 0.2s' }} className="hover:bg-[rgba(255,255,255,0.02)]">
+                                                    <td style={{ padding: '24px 32px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' }}>
+                                                                {(w.profiles?.full_name?.[0] || 'E')}
+                                                            </div>
+                                                            <div>
+                                                                <p style={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '15px' }}>{w.profiles?.full_name || 'Usuário Desconhecido'}</p>
+                                                                <p style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <Clock size={12} /> {new Date(w.created_at || w.dateCreated).toLocaleDateString('pt-BR')} às {new Date(w.created_at || w.dateCreated).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '24px 32px' }}>
+                                                        <span style={{ display: 'inline-flex', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', fontWeight: 'bold', fontSize: '14px' }}>
+                                                            R$ {((w.value || 0) * 1.5).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '24px 32px' }}>
+                                                        <span style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)' }}>
+                                                            R$ {w.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '24px 32px', textAlign: 'right' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+                                                            <button 
+                                                                onClick={() => setShowRejectModal(w.id)}
+                                                                style={{ padding: '10px 20px', borderRadius: '12px', background: 'transparent', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                                className="hover:bg-[rgba(239,68,68,0.1)]"
+                                                            >
+                                                                Recusar
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleApproveWithdrawal(w.id, w.value || 0)}
+                                                                style={{ padding: '10px 24px', borderRadius: '12px', background: '#10b981', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', transition: 'all 0.2s' }}
+                                                                className="hover:opacity-80 hover:-translate-y-0.5"
+                                                            >
+                                                                <DollarSign size={16} /> Aprovar Saque
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── Approvals ─── */}
+                {activeTab === 'approvals' && (
+                    <div>
+                        {pendingEditors.length === 0 ? (
+                            <div className="py-20 text-center rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                <CheckCircle size={40} className="mx-auto mb-4 opacity-20" />
+                                <p className="font-medium text-sm" style={{ color: 'var(--text-muted)' }}>Nenhum candidato aguardando aprovação</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {pendingEditors.map(editor => (
+                                    <div
+                                        key={editor.id}
+                                        className="flex items-center justify-between px-6 py-4 rounded-2xl transition-all"
+                                        style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                                                style={{ background: 'var(--primary)' }}>
+                                                {editor.full_name?.[0]?.toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{editor.full_name}</p>
+                                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{editor.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setViewingContact(editor)}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                                                style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
+                                            >
+                                                Ver perfil
+                                            </button>
+                                            {editor.portfolio_url && (
+                                                <a
+                                                    href={editor.portfolio_url}
+                                                    target="_blank"
+                                                    className="p-1.5 rounded-lg transition-all hover:opacity-80"
+                                                    style={{ color: 'var(--primary)' }}
+                                                >
+                                                    <ExternalLink size={15} />
+                                                </a>
+                                            )}
+                                            <button
+                                                onClick={() => setShowEditorRejectModal(editor.id)}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                                                style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                                            >
+                                                Recusar
+                                            </button>
+                                            <button
+                                                onClick={() => handleApproveEditor(editor.id)}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all hover:opacity-80"
+                                                style={{ background: '#10b981' }}
+                                            >
+                                                Aprovar
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-                    </button>
-                </div>
+                    </div>
+                )}
+
+                {/* ─── Editors ─── */}
+                {activeTab === 'editors' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <h2 className="text-xl font-bold" style={{ color: 'var(--text-main)', margin: 0 }}>Base de Editores</h2>
+                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                                    {allEditors.length} contatos
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                {selectedEditors.length > 0 && (
+                                    <button 
+                                        onClick={() => { if(confirm('Quer mesmo excluir?')) setSelectedEditors([]) }}
+                                        className="rounded-xl text-xs font-medium transition-all hover:opacity-80"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                                    >
+                                        <Trash2 size={14} /> Excluir ({selectedEditors.length})
+                                    </button>
+                                )}
+
+                                <button className="rounded-xl text-xs font-medium text-white transition-all hover:opacity-80"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--primary)' }}>
+                                    <Plus size={14} /> Novo Editor
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', borderBottom: '1px solid var(--glass-border)' }}>
+                           <button className="text-sm font-medium" style={{ padding: '12px 0', borderBottom: '2px solid var(--primary)', color: 'var(--primary)', background: 'transparent' }}>
+                               Todos os Editores
+                           </button>
+
+                        </div>
+
+                        {/* Filter Bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ position: 'relative', flex: 1, minWidth: '250px', maxWidth: '400px' }}>
+                                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nome, email ou telefone..."
+                                    value={editorSearch}
+                                    onChange={e => setEditorSearch(e.target.value)}
+                                    className="text-sm rounded-xl outline-none transition-all"
+                                    style={{ width: '100%', padding: '10px 16px 10px 36px', background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                />
+                            </div>
+
+                            <button 
+                                onClick={() => setEditorSearch('')}
+                                className="text-sm rounded-xl transition-all hover:opacity-80" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', color: 'var(--text-muted)', background: 'transparent', border: 'none' }}>
+                                Limpar
+                            </button>
+                        </div>
+
+                        {/* Table */}
+                        <div className="rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', overflowX: 'auto' }}>
+                            <table style={{ width: '100%', fontSize: '14px', textAlign: 'left', borderCollapse: 'collapse', minWidth: '800px' }}>
+                                <thead style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
+                                    <tr>
+                                        <th style={{ padding: '16px', width: '48px', textAlign: 'center' }}>
+                                            <input type="checkbox" className="rounded cursor-pointer" 
+                                                   onChange={(e) => setSelectedEditors(e.target.checked ? allEditors.map(x=>x.id) : [])}
+                                                   checked={selectedEditors.length === allEditors.length && allEditors.length > 0} />
+                                        </th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Nome do contato</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Telefone</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>E-mail</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Criado</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Etiquetas</th>
+                                        <th style={{ padding: '16px', width: '48px' }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allEditors.filter(e => !editorSearch || e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) || e.email?.toLowerCase().includes(editorSearch.toLowerCase())).length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: '80px 16px', textAlign: 'center' }}>
+                                                <Briefcase size={36} style={{ margin: '0 auto 12px auto', opacity: 0.2, color: 'var(--text-muted)' }} />
+                                                <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>Nenhum contato encontrado.</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        allEditors.filter(e => !editorSearch || e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) || e.email?.toLowerCase().includes(editorSearch.toLowerCase())).map(e => (
+                                            <tr key={e.id} className="transition-all hover:bg-[rgba(255,255,255,0.02)] cursor-pointer" style={{ borderBottom: '1px solid var(--glass-border)' }} onClick={() => setViewingContact(e)}>
+                                                <td style={{ padding: '16px', textAlign: 'center' }} onClick={(ev) => ev.stopPropagation()}>
+                                                    <input type="checkbox" className="rounded cursor-pointer" 
+                                                           checked={selectedEditors.includes(e.id)}
+                                                           onChange={(ev) => {
+                                                               if(ev.target.checked) setSelectedEditors([...selectedEditors, e.id])
+                                                               else setSelectedEditors(selectedEditors.filter(id => id !== e.id))
+                                                           }} />
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 'bold', flexShrink: 0, background: 'var(--primary)' }}>
+                                                            {e.full_name?.[0]?.toUpperCase() || '?'}
+                                                        </div>
+                                                        <span style={{ fontWeight: '600', color: 'var(--text-main)', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.full_name || '—'}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                                                        <Phone size={13} /> {e.whatsapp || '—'}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                                                        <Mail size={13} /> <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.email || '—'}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px', fontSize: '14px', color: 'var(--text-muted)' }}>
+                                                    {e.created_at ? new Date(e.created_at).toLocaleDateString('pt-BR') : '—'}
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{
+                                                        display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500',
+                                                        background: e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                                        color: e.onboarding_status === 'approved' ? '#10b981' : '#f59e0b',
+                                                        border: `1px solid ${e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`
+                                                    }}>
+                                                        {e.onboarding_status === 'approved' ? 'Editor Ativo' : 'Pendente'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'right' }} onClick={(ev) => ev.stopPropagation()}>
+                                                    <button className="transition-all hover:bg-[rgba(255,255,255,0.05)]" style={{ padding: '8px', borderRadius: '8px', color: 'var(--text-muted)', border: 'none', background: 'transparent' }}>
+                                                        <MoreHorizontal size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── Clients ─── */}
+                {activeTab === 'clients' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <h2 className="text-xl font-bold" style={{ color: 'var(--text-main)', margin: 0 }}>Base de Clientes</h2>
+                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                                    {allClients.length} contatos
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                {selectedClients.length > 0 && (
+                                    <button 
+                                        onClick={() => { if(confirm('Quer mesmo excluir?')) setSelectedClients([]) }}
+                                        className="rounded-xl text-xs font-medium transition-all hover:opacity-80"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                                    >
+                                        <Trash2 size={14} /> Excluir ({selectedClients.length})
+                                    </button>
+                                )}
+                                <button className="rounded-xl text-xs font-medium text-white transition-all hover:opacity-80"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--secondary)' }}>
+                                    <Plus size={14} /> Novo Cliente
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', borderBottom: '1px solid var(--glass-border)' }}>
+                           <button className="text-sm font-medium" style={{ padding: '12px 0', borderBottom: '2px solid var(--secondary)', color: 'var(--secondary)', background: 'transparent' }}>
+                               Todos os Clientes
+                           </button>
+                        </div>
+
+                        {/* Filter Bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ position: 'relative', flex: 1, minWidth: '250px', maxWidth: '400px' }}>
+                                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nome, email ou telefone..."
+                                    value={clientSearch}
+                                    onChange={e => setClientSearch(e.target.value)}
+                                    className="text-sm rounded-xl outline-none transition-all"
+                                    style={{ width: '100%', padding: '10px 16px 10px 36px', background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', boxSizing: 'border-box' }}
+                                />
+                            </div>
+
+                            <button 
+                                onClick={() => setClientSearch('')}
+                                className="text-sm rounded-xl transition-all hover:opacity-80" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', color: 'var(--text-muted)', background: 'transparent', border: 'none' }}>
+                                Limpar
+                            </button>
+                        </div>
+
+                        {/* Table */}
+                        <div className="rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', overflowX: 'auto' }}>
+                            <table style={{ width: '100%', fontSize: '14px', textAlign: 'left', borderCollapse: 'collapse', minWidth: '800px' }}>
+                                <thead style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
+                                    <tr>
+                                        <th style={{ padding: '16px', width: '48px', textAlign: 'center' }}>
+                                            <input type="checkbox" className="rounded cursor-pointer" 
+                                                   onChange={(e) => setSelectedClients(e.target.checked ? allClients.map(x=>x.id) : [])}
+                                                   checked={selectedClients.length === allClients.length && allClients.length > 0} />
+                                        </th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Nome do contato</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Telefone</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>E-mail</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Criado</th>
+                                        <th style={{ padding: '16px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Etiquetas</th>
+                                        <th style={{ padding: '16px', width: '48px' }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allClients.filter(c => !clientSearch || c.full_name?.toLowerCase().includes(clientSearch.toLowerCase()) || c.email?.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: '80px 16px', textAlign: 'center' }}>
+                                                <Users size={36} style={{ margin: '0 auto 12px auto', opacity: 0.2, color: 'var(--text-muted)' }} />
+                                                <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>Nenhum cliente encontrado.</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        allClients.filter(c => !clientSearch || c.full_name?.toLowerCase().includes(clientSearch.toLowerCase()) || c.email?.toLowerCase().includes(clientSearch.toLowerCase())).map(c => (
+                                            <tr key={c.id} className="transition-all hover:bg-[rgba(255,255,255,0.02)] cursor-pointer" style={{ borderBottom: '1px solid var(--glass-border)' }} onClick={() => setViewingContact(c)}>
+                                                <td style={{ padding: '16px', textAlign: 'center' }} onClick={(ev) => ev.stopPropagation()}>
+                                                    <input type="checkbox" className="rounded cursor-pointer" 
+                                                           checked={selectedClients.includes(c.id)}
+                                                           onChange={(ev) => {
+                                                               if(ev.target.checked) setSelectedClients([...selectedClients, c.id])
+                                                               else setSelectedClients(selectedClients.filter(id => id !== c.id))
+                                                           }} />
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 'bold', flexShrink: 0, background: 'var(--secondary)' }}>
+                                                            {c.full_name?.[0]?.toUpperCase() || '?'}
+                                                        </div>
+                                                        <span style={{ fontWeight: '600', color: 'var(--text-main)', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.full_name || '—'}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                                                        <Phone size={13} /> {c.whatsapp || '—'}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                                                        <Mail size={13} /> <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email || '—'}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px', fontSize: '14px', color: 'var(--text-muted)' }}>
+                                                    {c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—'}
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', background: 'rgba(56,189,248,0.1)', color: 'var(--secondary)', border: '1px solid rgba(56,189,248,0.2)' }}>
+                                                        Cliente Ativo
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'right' }} onClick={(ev) => ev.stopPropagation()}>
+                                                    <button className="transition-all hover:bg-[rgba(255,255,255,0.05)]" style={{ padding: '8px', borderRadius: '8px', color: 'var(--text-muted)', border: 'none', background: 'transparent' }}>
+                                                        <MoreHorizontal size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── Leads ─── */}
+                {activeTab === 'leads' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-1 max-w-sm">
+                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar leads..."
+                                    value={leadSearch}
+                                    onChange={e => setLeadSearch(e.target.value)}
+                                    className="w-full text-sm rounded-xl pl-9 pr-4 py-2.5 outline-none"
+                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                />
+                            </div>
+                            <button
+                                onClick={() => { setEditingLead(null); setLeadForm({ full_name: '', email: '', whatsapp: '', status: 'Novo', source: '', notes: '' }); setShowLeadModal(true) }}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white"
+                                style={{ background: 'var(--primary)' }}
+                            >
+                                <Plus size={15} /> Novo Lead
+                            </button>
+                        </div>
+
+                        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                            <table className="w-full text-sm">
+                                <thead style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                    <tr>
+                                        {['Nome', 'Contato', 'Status', 'Origem', ''].map(h => (
+                                            <th key={h} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredLeads.map(lead => (
+                                        <tr key={lead.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                            <td className="px-6 py-3 font-medium" style={{ color: 'var(--text-main)' }}>{lead.full_name}</td>
+                                            <td className="px-6 py-3" style={{ color: 'var(--text-muted)' }}>
+                                                <span className="block">{lead.email}</span>
+                                                <span className="text-xs">{lead.whatsapp}</span>
+                                            </td>
+                                            <td className="px-6 py-3">
+                                                <span className="px-2 py-1 rounded-md text-xs font-medium"
+                                                    style={{
+                                                        background: lead.status === 'Convertido' ? 'rgba(16,185,129,0.1)' : lead.status === 'Negociando' ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.05)',
+                                                        color: lead.status === 'Convertido' ? '#10b981' : lead.status === 'Negociando' ? 'var(--primary)' : 'var(--text-muted)'
+                                                    }}>
+                                                    {lead.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3" style={{ color: 'var(--text-muted)' }}>{lead.source || '—'}</td>
+                                            <td className="px-6 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => { setEditingLead(lead); setLeadForm({ full_name: lead.full_name, email: lead.email, whatsapp: lead.whatsapp, status: lead.status, source: lead.source, notes: lead.notes }); setShowLeadModal(true) }}
+                                                        style={{ color: 'var(--text-muted)' }} className="hover:opacity-60"
+                                                    >
+                                                        <Eye size={15} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteLead(lead.id)} style={{ color: '#ef4444' }} className="hover:opacity-60">
+                                                        <X size={15} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {filteredLeads.length === 0 && (
+                                <div className="py-12 text-center" style={{ color: 'var(--text-muted)' }}>
+                                    <p className="text-sm">Nenhum lead encontrado</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ─── CRM ─── */}
+                {activeTab === 'crm' && (
+                    <KanbanBoard />
+                )}
             </div>
 
-            {activeTab === 'finance' ? (
-                <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
-                        <div className="glass" style={{ padding: '24px', borderRadius: '24px' }}>
-                            <h3>Taxa da Plataforma</h3>
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                                <input type="number" value={commissionPercentage} onChange={(e) => setCommissionPercentage(Number(e.target.value))} style={{ width: '100%', padding: '12px', borderRadius: '12px', background: 'var(--input-bg)', border: '1px solid var(--glass-border)', color: '#fff' }} />
-                                <button onClick={handleUpdateFee} className="btn-primary" style={{ padding: '0 24px' }}>Salvar</button>
+            {/* ─── Modal: Viewing Contact ─── */}
+            {viewingContact && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
+                    <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold"
+                                    style={{ background: viewingContact.role === 'client' ? 'var(--secondary)' : 'var(--primary)', fontSize: 16 }}>
+                                    {viewingContact.full_name?.[0]?.toUpperCase() || '?'}
+                                </div>
+                                <div>
+                                    <p className="font-semibold" style={{ color: 'var(--text-main)' }}>{viewingContact.full_name || '—'}</p>
+                                    <p className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
+                                        {viewingContact.role === 'client' ? 'Cliente' : 'Editor'}
+                                        {viewingContact.onboarding_status === 'approved' && ' · Ativo'}
+                                        {viewingContact.onboarding_status === 'pending' && ' · Pendente'}
+                                        {viewingContact.onboarding_status === 'rejected' && ' · Recusado'}
+                                    </p>
+                                </div>
                             </div>
+                            <button onClick={() => setViewingContact(null)} style={{ color: 'var(--text-muted)' }} className="hover:opacity-60">
+                                <X size={20} />
+                            </button>
                         </div>
-                        <div className="glass" style={{ padding: '24px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(34, 197, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DollarSign color="#22c55e" /></div>
+
+                        {/* Modal Body */}
+                        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+                            {/* Contact Info */}
                             <div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Editores Ativos</div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{stats.activeEditors}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="glass" style={{ borderRadius: '24px', overflow: 'hidden', marginBottom: '40px' }}>
-                        <div style={{ padding: '24px', borderBottom: '1px solid var(--glass-border)' }}><h2>Payouts de Projetos</h2></div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}><th style={{ padding: '16px 24px' }}>PROJETO</th><th style={{ padding: '16px 24px' }}>EDITOR</th><th style={{ padding: '16px 24px' }}>VALOR</th><th style={{ padding: '16px 24px', textAlign: 'right' }}>AÇÃO</th></tr></thead>
-                            <tbody>
-                                {pendingProjectPayouts.map(p => (
-                                    <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '16px 24px' }}>{p.title}</td>
-                                        <td style={{ padding: '16px 24px' }}>{p.editor?.full_name}</td>
-                                        <td style={{ padding: '16px 24px' }}>R$ {p.final_price}</td>
-                                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                            <button onClick={() => handleReleaseProjectPayout(p)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem' }}>Liberar</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="glass" style={{ borderRadius: '24px', overflow: 'hidden' }}>
-                        <div style={{ padding: '24px', borderBottom: '1px solid var(--glass-border)' }}><h2>Saques Pendentes</h2></div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}><th style={{ padding: '16px 24px' }}>EDITOR</th><th style={{ padding: '16px 24px' }}>VALOR</th><th style={{ padding: '16px 24px' }}>PIX</th><th style={{ padding: '16px 24px', textAlign: 'right' }}>AÇÕES</th></tr></thead>
-                            <tbody>
-                                {pendingWithdrawals.map(tx => (
-                                    <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '16px 24px' }}>{tx.profiles?.full_name}</td>
-                                        <td style={{ padding: '16px 24px' }}>R$ {tx.amount}</td>
-                                        <td style={{ padding: '16px 24px' }}>{tx.metadata?.pixKey}</td>
-                                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                <button onClick={() => handleApprove(tx.id)} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', border: 'none', cursor: 'pointer' }}><Check size={16} /></button>
-                                                <button onClick={() => setShowRejectModal(tx.id)} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </>
-            ) : (
-                <div className="glass" style={{ borderRadius: '24px', overflow: 'hidden' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--glass-border)' }}><h2>Novos Candidatos</h2></div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}><th style={{ padding: '16px 24px' }}>NOME</th><th style={{ padding: '16px 24px' }}>VÍDEO / EXP</th><th style={{ padding: '16px 24px' }}>DATA</th><th style={{ padding: '16px 24px', textAlign: 'right' }}>AÇÃO</th></tr></thead>
-                        <tbody>
-                            {pendingEditors.map(editor => (
-                                <tr key={editor.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <td style={{ padding: '16px 24px' }}>{editor.full_name}</td>
-                                    <td style={{ padding: '16px 24px' }}>{editor.editing_experience}</td>
-                                    <td style={{ padding: '16px 24px' }}>{new Date(editor.updated_at).toLocaleDateString()}</td>
-                                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                        <button onClick={() => setViewingEditor(editor)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem' }}>Analisar</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {viewingEditor && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-                    <div className="glass" style={{ maxWidth: '1000px', width: '100%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '32px', padding: '40px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
-                            <h2>Dossiê: {viewingEditor.full_name}</h2>
-                            <button onClick={() => setViewingEditor(null)} style={{ background: 'none', border: 'none', color: '#fff' }}><X /></button>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '40px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div className="glass" style={{ padding: '20px', borderRadius: '20px' }}>
-                                    <h3>Documentos de Verificação</h3>
-                                    <div style={{ display: 'grid', gap: '16px', marginTop: '16px' }}>
-                                        <div>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Identidade (RG/CNH)</p>
-                                            {viewingEditor.identity_doc_url ? (
-                                                <img src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/editor-identity/${viewingEditor.identity_doc_url}`} alt="ID" style={{ width: '100%', borderRadius: '12px', border: '1px solid var(--glass-border)' }} />
-                                            ) : <p style={{ fontSize: '0.9rem', opacity: 0.5 }}>Não anexado</p>}
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Contato</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Mail size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                        <div className="min-w-0">
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Email</p>
+                                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || '—'}</p>
                                         </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Phone size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                         <div>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Foto do Rosto (Selfie)</p>
-                                            {viewingEditor.face_photo_url ? (
-                                                <img src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/editor-face/${viewingEditor.face_photo_url}`} alt="Face" style={{ width: '100%', borderRadius: '12px', border: '1px solid var(--glass-border)' }} />
-                                            ) : <p style={{ fontSize: '0.9rem', opacity: 0.5 }}>Não anexada</p>}
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>WhatsApp</p>
+                                            <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.whatsapp || '—'}</p>
+                                        </div>
+                                    </div>
+                                    {viewingContact.location && (
+                                        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <MapPin size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                            <div>
+                                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Localização</p>
+                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.location}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Calendar size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                        <div>
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Membro desde</p>
+                                            <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>
+                                                {viewingContact.created_at ? new Date(viewingContact.created_at).toLocaleDateString('pt-BR') : '—'}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div>
-                                <p><strong>Habilidades:</strong> {viewingEditor.software_skills?.join(', ')}</p>
-                                <p style={{ marginTop: '12px' }}><strong>Motivação:</strong> {viewingEditor.motivation}</p>
-                                <p style={{ marginTop: '12px' }}><strong>Portfolio:</strong></p>
-                                <div style={{ display: 'grid', gap: '8px', marginTop: '8px' }}>
-                                    {viewingEditor.portfolio_links?.map((link: string, idx: number) => {
-                                        const isInternalFile = link && !link.startsWith('http');
-                                        if (isInternalFile) {
-                                            return (
-                                                <div key={idx} style={{ background: '#000', borderRadius: '12px', padding: '8px', border: '1px solid var(--glass-border)' }}>
-                                                    <video 
-                                                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/editor-portfolio/${link}`} 
-                                                        controls 
-                                                        style={{ width: '100%', borderRadius: '8px' }}
-                                                    />
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <a key={idx} href={link} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <ExternalLink size={14} /> Ver link externo {idx + 1}
-                                            </a>
-                                        );
-                                    })}
-                                    {(!viewingEditor.portfolio_links || viewingEditor.portfolio_links.length === 0) && (
-                                        <p style={{ opacity: 0.5 }}>Nenhum portfólio fornecido</p>
+
+                            {/* Editor-specific info */}
+                            {viewingContact.role === 'editor' && (
+                                <>
+                                    {/* Skills & Experience */}
+                                    {(viewingContact.software_skills?.length > 0 || viewingContact.editing_experience) && (
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Habilidades</p>
+                                            <div className="space-y-3">
+                                                {viewingContact.software_skills?.length > 0 && (
+                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Code size={13} style={{ color: 'var(--primary)' }} />
+                                                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Softwares</span>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {viewingContact.software_skills.map((s: string) => (
+                                                                <span key={s} className="px-2 py-0.5 rounded text-xs"
+                                                                    style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                                    {s}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {viewingContact.editing_experience && (
+                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Star size={13} style={{ color: 'var(--primary)' }} />
+                                                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Experiência</span>
+                                                        </div>
+                                                        <p className="text-sm" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
+
+                                    {/* Availability & Price */}
+                                    {(viewingContact.weekly_availability || viewingContact.price_expectation) && (
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Disponibilidade</p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {viewingContact.weekly_availability && (
+                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Clock size={13} style={{ color: 'var(--primary)' }} />
+                                                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Horas/semana</span>
+                                                        </div>
+                                                        <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability}</p>
+                                                    </div>
+                                                )}
+                                                {viewingContact.price_expectation && (
+                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão</p>
+                                                        <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Portfolio */}
+                                    {viewingContact.portfolio_url && (
+                                        <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
+                                            className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+                                            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--primary)', textDecoration: 'none', display: 'flex' }}>
+                                            <span>Ver portfólio externo</span>
+                                            <ExternalLink size={14} />
+                                        </a>
+                                    )}
+
+                                    {/* Documents */}
+                                    {(editorUrls.identity || editorUrls.face) && (
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Documentos</p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {editorUrls.identity ? (
+                                                    <div>
+                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Documento</p>
+                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-32 object-cover rounded-xl" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Sem documento</div>
+                                                )}
+                                                {editorUrls.face ? (
+                                                    <div>
+                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Selfie</p>
+                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-32 object-cover rounded-xl" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Motivation */}
+                                    {viewingContact.motivation && (
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Motivação</p>
+                                            <p className="text-sm p-3 rounded-xl" style={{ color: 'var(--text-main)', background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                {viewingContact.motivation}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* WhatsApp Quick Action */}
+                                    {viewingContact.whatsapp && (
+                                        <a
+                                            href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
+                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
+                                        >
+                                            <MessageSquare size={16} /> Abrir no WhatsApp
+                                        </a>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Client-specific: WhatsApp */}
+                            {viewingContact.role === 'client' && viewingContact.whatsapp && (
+                                <a
+                                    href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
+                                    style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
+                                >
+                                    <MessageSquare size={16} /> Abrir no WhatsApp
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Modal: Reject Withdrawal ─── */}
+            {showRejectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+                    <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                        <h3 className="font-semibold mb-4" style={{ color: 'var(--text-main)' }}>Motivo da recusa</h3>
+                        <textarea
+                            value={rejectionReason}
+                            onChange={e => setRejectionReason(e.target.value)}
+                            placeholder="Descreva o motivo..."
+                            className="w-full h-28 rounded-xl px-4 py-3 text-sm outline-none resize-none mb-4"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                        />
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowRejectModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Cancelar</button>
+                            <button onClick={handleReject} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white" style={{ background: '#ef4444' }}>Confirmar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Modal: Reject Editor ─── */}
+            {showEditorRejectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+                    <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                        <h3 className="font-semibold mb-4" style={{ color: 'var(--text-main)' }}>Motivo da recusa</h3>
+                        <textarea
+                            value={editorRejectionReason}
+                            onChange={e => setEditorRejectionReason(e.target.value)}
+                            placeholder="Descreva o motivo..."
+                            className="w-full h-28 rounded-xl px-4 py-3 text-sm outline-none resize-none mb-4"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                        />
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowEditorRejectModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Cancelar</button>
+                            <button onClick={handleRejectEditor} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white" style={{ background: '#ef4444' }}>Recusar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Modal: Lead Form ─── */}
+            {showLeadModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+                    <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-main)' }}>{editingLead ? 'Editar Lead' : 'Novo Lead'}</h3>
+                            <button onClick={() => setShowLeadModal(false)} style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {[
+                                { label: 'Nome', key: 'full_name', placeholder: 'Nome completo' },
+                                { label: 'Email', key: 'email', placeholder: 'email@example.com' },
+                                { label: 'WhatsApp', key: 'whatsapp', placeholder: '+55 11 99999-9999' },
+                                { label: 'Origem', key: 'source', placeholder: 'Instagram, Google...' },
+                            ].map(f => (
+                                <div key={f.key}>
+                                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>{f.label}</label>
+                                    <input
+                                        value={(leadForm as any)[f.key]}
+                                        onChange={e => setLeadForm({ ...leadForm, [f.key]: e.target.value })}
+                                        placeholder={f.placeholder}
+                                        className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                        style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                    />
                                 </div>
-                                <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
-                                    <button onClick={() => setShowEditorRejectModal(viewingEditor.id)} style={{ flex: 1, padding: '14px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid #ef4444' }}>Recusar</button>
-                                    <button onClick={() => handleApproveEditor(viewingEditor.id)} className="btn-primary" style={{ flex: 1, padding: '14px', borderRadius: '14px' }}>Aprovar Agora</button>
-                                </div>
+                            ))}
+                            <div>
+                                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Status</label>
+                                <select
+                                    value={leadForm.status}
+                                    onChange={e => setLeadForm({ ...leadForm, status: e.target.value })}
+                                    className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                >
+                                    {['Novo', 'Contatado', 'Negociando', 'Convertido', 'Arquivado'].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Observações</label>
+                                <textarea
+                                    value={leadForm.notes}
+                                    onChange={e => setLeadForm({ ...leadForm, notes: e.target.value })}
+                                    placeholder="Anotações sobre o lead..."
+                                    className="w-full h-24 rounded-xl px-4 py-2.5 text-sm outline-none resize-none"
+                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                />
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {showEditorRejectModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div className="glass" style={{ maxWidth: '400px', width: '100%', padding: '32px', borderRadius: '24px' }}>
-                        <h3>Motivo da Recusa</h3>
-                        <textarea value={editorRejectionReason} onChange={(e) => setEditorRejectionReason(e.target.value)} style={{ width: '100%', height: '120px', marginTop: '16px', padding: '12px', borderRadius: '12px', background: '#000', color: '#fff', border: '1px solid var(--glass-border)' }} />
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                            <button onClick={() => setShowEditorRejectModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#333', border: 'none', color: '#fff' }}>Voltar</button>
-                            <button onClick={handleRejectEditor} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#ef4444', border: 'none', color: '#fff' }}>Confirmar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showRejectModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div className="glass" style={{ maxWidth: '400px', width: '100%', padding: '32px', borderRadius: '24px' }}>
-                        <h3>Motivo da Recusa (Saque)</h3>
-                        <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} style={{ width: '100%', height: '120px', marginTop: '16px', padding: '12px', borderRadius: '12px', background: '#000', color: '#fff', border: '1px solid var(--glass-border)' }} />
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                            <button onClick={() => setShowRejectModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#333', border: 'none', color: '#fff' }}>Voltar</button>
-                            <button onClick={handleReject} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#ef4444', border: 'none', color: '#fff' }}>Confirmar</button>
+                        <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                            <button onClick={() => setShowLeadModal(false)} className="flex-1 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Cancelar</button>
+                            <button onClick={handleSaveLead} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white" style={{ background: 'var(--primary)' }}>
+                                {editingLead ? 'Salvar' : 'Criar Lead'}
+                            </button>
                         </div>
                     </div>
                 </div>

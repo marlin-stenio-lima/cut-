@@ -56,6 +56,8 @@ const ChatPage: React.FC = () => {
     const [sending, setSending] = useState(false)
     const [previewFile, setPreviewFile] = useState<any | null>(null);
     const [showFilesModal, setShowFilesModal] = useState(false);
+    const [showCounterModal, setShowCounterModal] = useState<any | null>(null);
+    const [counterPrice, setCounterPrice] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -302,9 +304,9 @@ id,
     // Client: Accept and Contract (Escrow Lock)
     const handleAcceptProposalFromChat = async (prop: any) => {
         if (!user || !profile || isActionLoading) return;
-        
+
         const finalPrice = Number(prop.counter_price || prop.offered_price || prop.project?.budget || 0);
-        
+
         const confirmed = await showConfirm(
             'Confirmar Contratação',
             `Confirmar contratação por R$ ${finalPrice}? O valor será reservado do seu saldo.`
@@ -371,7 +373,7 @@ id,
             });
 
             showAlert('Sucesso!', 'Contrato firmado! Saldo reservado e projeto iniciado.', 'success');
-            
+
             // Refresh
             fetchNegotiationHistory(prop.project_id);
             if (selectedProject) {
@@ -388,7 +390,7 @@ id,
     // Editor: Accept Client's Price
     const handleEditorAcceptValue = async (prop: any) => {
         if (!user || isActionLoading) return;
-        
+
         const price = Number(prop.counter_price);
         const confirmed = await showConfirm(
             'Aceitar Valor',
@@ -406,12 +408,43 @@ id,
                     last_sender_id: user.id
                 })
                 .eq('id', prop.id);
-            
+
             if (error) throw error;
             showAlert('Sucesso!', 'Você aceitou o valor! O cliente agora pode finalizar o pagamento.', 'success');
             fetchNegotiationHistory(prop.project_id);
         } catch (err: any) {
             alert(`Erro: ${err.message}`);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    const handleSendCounterOfferFromChat = async () => {
+        if (!showCounterModal || !counterPrice || !user) return;
+
+        setIsActionLoading(showCounterModal.id);
+        try {
+            const nextRound = (showCounterModal.negotiation_round || 1) + 1;
+
+            const { error } = await supabase
+                .from('proposals')
+                .update({
+                    counter_price: Number(counterPrice),
+                    negotiation_round: nextRound,
+                    last_sender_id: user.id,
+                    status: 'pending'
+                })
+                .eq('id', showCounterModal.id);
+
+            if (error) throw error;
+
+            showAlert('Sucesso!', 'Contraproposta enviada com sucesso.', 'success');
+            setShowCounterModal(null);
+            setCounterPrice('');
+            fetchNegotiationHistory(showCounterModal.project_id);
+        } catch (err: any) {
+            console.error('Error sending counter-offer:', err);
+            showAlert('Erro', `Falha ao enviar: ${err.message}`, 'error');
         } finally {
             setIsActionLoading(null);
         }
@@ -531,8 +564,7 @@ id,
                                 color: 'var(--text-main)',
                                 fontSize: '0.9rem',
                                 outline: 'none'
-                            }}
-                        />
+                            }} />
                     </div>
                 </div>
 
@@ -701,150 +733,182 @@ id,
                                         const isAccepted = prop.status === 'accepted';
 
                                         return (
-                                        <div key={prop.id} style={{
-                                            borderRadius: '18px', overflow: 'hidden', marginBottom: '12px',
-                                            border: `1px solid ${isAccepted ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.15)'}`,
-                                            background: isAccepted
-                                                ? 'linear-gradient(135deg, rgba(34,197,94,0.04), rgba(0,0,0,0.2))'
-                                                : 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(0,0,0,0.2))'
-                                        }}>
-                                            {/* Accent bar */}
-                                            <div style={{ height: '2px', background: isAccepted ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
+                                            <div key={prop.id} style={{
+                                                borderRadius: '18px', overflow: 'hidden', marginBottom: '12px',
+                                                border: `1px solid ${isAccepted ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.15)'}`,
+                                                background: isAccepted
+                                                    ? 'linear-gradient(135deg, rgba(34,197,94,0.04), rgba(0,0,0,0.2))'
+                                                    : 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(0,0,0,0.2))'
+                                            }}>
+                                                {/* Accent bar */}
+                                                <div style={{ height: '2px', background: isAccepted ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,#6366f1,#8b5cf6)' }} />
 
-                                            <div style={{ padding: '16px 20px' }}>
-                                                {/* Row 1: Editor + Status */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <div style={{
-                                                            width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-                                                            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                            fontWeight: 800, fontSize: '0.9rem', color: 'white'
-                                                        }}>{(prop.editor?.full_name || 'E')[0].toUpperCase()}</div>
-                                                        <div>
-                                                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{prop.editor?.full_name || 'Editor'}</div>
-                                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                                                {new Date(prop.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                <div style={{ padding: '16px 20px' }}>
+                                                    {/* Row 1: Editor + Status */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                                                                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontWeight: 800, fontSize: '0.9rem', color: 'white'
+                                                            }}>{(prop.editor?.full_name || 'E')[0].toUpperCase()}</div>
+                                                            <div>
+                                                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{prop.editor?.full_name || 'Editor'}</div>
+                                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                    {new Date(prop.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                        <span style={{
+                                                            fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '100px',
+                                                            background: isAccepted ? 'rgba(34,197,94,0.12)' : 'rgba(251,191,36,0.1)',
+                                                            color: isAccepted ? '#22c55e' : '#fbbf24',
+                                                            display: 'flex', alignItems: 'center', gap: '4px'
+                                                        }}>
+                                                            {isAccepted ? <><CheckCircle2 size={11} /> Aceita</> : '⏳ Pendente'}
+                                                        </span>
                                                     </div>
-                                                    <span style={{
-                                                        fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: '100px',
-                                                        background: isAccepted ? 'rgba(34,197,94,0.12)' : 'rgba(251,191,36,0.1)',
-                                                        color: isAccepted ? '#22c55e' : '#fbbf24',
-                                                        display: 'flex', alignItems: 'center', gap: '4px'
+
+                                                    {/* Row 2: Price timeline */}
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                                                        padding: '12px 16px', borderRadius: '12px',
+                                                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                                                        marginBottom: '12px'
                                                     }}>
-                                                        {isAccepted ? <><CheckCircle2 size={11} /> Aceita</> : '⏳ Pendente'}
-                                                    </span>
+                                                        {/* Client budget */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Budget</span>
+                                                            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-muted)' }}>R$ {budget}</span>
+                                                        </div>
+
+                                                        {offered && (
+                                                            <>
+                                                                <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                    <span style={{ fontSize: '0.6rem', color: '#6366f1', textTransform: 'uppercase', fontWeight: 700 }}>Editor pediu</span>
+                                                                    <span style={{ fontWeight: 800, fontSize: '1rem', color: offered > budget ? '#fbbf24' : '#4ade80' }}>R$ {offered}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+
+                                                        {counter && (
+                                                            <>
+                                                                <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                    <span style={{ fontSize: '0.6rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Cliente contra</span>
+                                                                    <span style={{ fontWeight: 800, fontSize: '1rem', color: '#38bdf8' }}>R$ {counter}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+
+                                                        {isAccepted && (
+                                                            <>
+                                                                <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
+                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                    <span style={{ fontSize: '0.6rem', color: '#22c55e', textTransform: 'uppercase', fontWeight: 700 }}>Fechado</span>
+                                                                    <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#22c55e' }}>R$ {counter || offered || budget}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Cover letter */}
+                                                    {prop.cover_letter && (
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, fontStyle: 'italic', display: 'flex', gap: '8px' }}>
+                                                            <FileText size={13} style={{ flexShrink: 0, marginTop: '3px', opacity: 0.5 }} />
+                                                            <span>{prop.cover_letter}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Action Buttons for Negotiation */}
+                                                    {!isAccepted && selectedProject?.status === 'Aberto' && (
+                                                        <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                                                            {/* Client UI: Accept Editor's Proposal */}
+                                                            {profile?.role === 'client' && prop.last_sender_id === prop.editor_id && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleAcceptProposalFromChat(prop)}
+                                                                        disabled={!!isActionLoading}
+                                                                        style={{
+                                                                            flex: 2, padding: '10px', borderRadius: '12px', border: 'none',
+                                                                            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                                                            color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                                                            boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
+                                                                        }}
+                                                                    >
+                                                                        {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                                        Aceitar e Contratar (R$ {offered})
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setShowCounterModal(prop);
+                                                                            setCounterPrice('');
+                                                                        }}
+                                                                        disabled={!!isActionLoading}
+                                                                        style={{
+                                                                            flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)',
+                                                                            background: 'rgba(255,255,255,0.05)',
+                                                                            color: 'white', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        Contraproposta
+                                                                    </button>
+                                                                </>
+                                                            )}
+
+                                                            {/* Client UI: Wait for Editor to respond to client's counter */}
+                                                            {profile?.role === 'client' && prop.last_sender_id === user?.id && (
+                                                                <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                    Aguardando resposta do editor...
+                                                                </div>
+                                                            )}
+
+                                                            {/* Editor UI: Accept Client's Counter-proposal */}
+                                                            {profile?.role === 'editor' && prop.last_sender_id !== user?.id && counter && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleEditorAcceptValue(prop)}
+                                                                        disabled={!!isActionLoading}
+                                                                        style={{
+                                                                            flex: 2, padding: '10px', borderRadius: '12px', border: 'none',
+                                                                            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                                                                            color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                                                            boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
+                                                                        }}
+                                                                    >
+                                                                        {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                                        Aceitar R$ {counter}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setShowCounterModal(prop);
+                                                                            setCounterPrice('');
+                                                                        }}
+                                                                        disabled={!!isActionLoading}
+                                                                        style={{
+                                                                            flex: 1, padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)',
+                                                                            background: 'rgba(255,255,255,0.05)',
+                                                                            color: 'white', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        Contraproposta
+                                                                    </button>
+                                                                </>
+                                                            )}
+
+                                                            {/* Editor UI: Wait for Client if Editor was last to propose */}
+                                                            {profile?.role === 'editor' && prop.last_sender_id === user?.id && (
+                                                                <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                    Aguardando aceite do cliente...
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                {/* Row 2: Price timeline */}
-                                                <div style={{
-                                                    display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
-                                                    padding: '12px 16px', borderRadius: '12px',
-                                                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
-                                                    marginBottom: '12px'
-                                                }}>
-                                                    {/* Client budget */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Budget</span>
-                                                        <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-muted)' }}>R$ {budget}</span>
-                                                    </div>
-
-                                                    {offered && (
-                                                        <>
-                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
-                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                                <span style={{ fontSize: '0.6rem', color: '#6366f1', textTransform: 'uppercase', fontWeight: 700 }}>Editor pediu</span>
-                                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: offered > budget ? '#fbbf24' : '#4ade80' }}>R$ {offered}</span>
-                                                            </div>
-                                                        </>
-                                                    )}
-
-                                                    {counter && (
-                                                        <>
-                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
-                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                                <span style={{ fontSize: '0.6rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Cliente contra</span>
-                                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#38bdf8' }}>R$ {counter}</span>
-                                                            </div>
-                                                        </>
-                                                    )}
-
-                                                    {isAccepted && (
-                                                        <>
-                                                            <ArrowRightLeft size={14} color="rgba(255,255,255,0.2)" />
-                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                                <span style={{ fontSize: '0.6rem', color: '#22c55e', textTransform: 'uppercase', fontWeight: 700 }}>Fechado</span>
-                                                                <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#22c55e' }}>R$ {counter || offered || budget}</span>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                {/* Cover letter */}
-                                                {prop.cover_letter && (
-                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, fontStyle: 'italic', display: 'flex', gap: '8px' }}>
-                                                        <FileText size={13} style={{ flexShrink: 0, marginTop: '3px', opacity: 0.5 }} />
-                                                        <span>{prop.cover_letter}</span>
-                                                    </div>
-                                                )}
-                                                {/* Action Buttons for Negotiation */}
-                                                {!isAccepted && selectedProject?.status === 'Aberto' && (
-                                                    <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-                                                        {/* Client UI: Accept Editor's Proposal */}
-                                                        {profile?.role === 'client' && prop.last_sender_id === prop.editor_id && (
-                                                            <button 
-                                                                onClick={() => handleAcceptProposalFromChat(prop)}
-                                                                disabled={!!isActionLoading}
-                                                                style={{
-                                                                    flex: 1, padding: '10px', borderRadius: '12px', border: 'none',
-                                                                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-                                                                    color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                                                    boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
-                                                                }}
-                                                            >
-                                                                {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                                                Aceitar e Contratar (R$ {offered})
-                                                            </button>
-                                                        )}
-
-                                                        {/* Client UI: Wait for Editor to respond to client's counter */}
-                                                        {profile?.role === 'client' && prop.last_sender_id === user?.id && (
-                                                            <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
-                                                                Aguardando resposta do editor...
-                                                            </div>
-                                                        )}
-
-                                                        {/* Editor UI: Accept Client's Counter-proposal */}
-                                                        {profile?.role === 'editor' && prop.last_sender_id !== user?.id && counter && (
-                                                            <button 
-                                                                onClick={() => handleEditorAcceptValue(prop)}
-                                                                disabled={!!isActionLoading}
-                                                                style={{
-                                                                    flex: 1, padding: '10px', borderRadius: '12px', border: 'none',
-                                                                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                                                                    color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                                                    boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
-                                                                }}
-                                                            >
-                                                                {isActionLoading === prop.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                                                Aceitar R$ {counter}
-                                                            </button>
-                                                        )}
-
-                                                        {/* Editor UI: Wait for Client if Editor was last to propose */}
-                                                        {profile?.role === 'editor' && prop.last_sender_id === user?.id && (
-                                                            <div style={{ flex: 1, textAlign: 'center', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
-                                                                Aguardando aceite do cliente...
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
                                         );
                                     })}
 
@@ -977,45 +1041,86 @@ id,
                     </div>
                 )}
             </div>
+
             {previewFile && <VideoModal file={previewFile} onClose={() => setPreviewFile(null)} />}
-            {showFilesModal && selectedProject && (
-                <ProjectFilesModal
-                    project={{
-                        id: selectedProject.project_id || selectedProject.id,
-                        title: selectedProject.title,
-                        project_files: selectedProject.project_files,
-                        ryver_link: selectedProject.ryver_link,
-                        editor_id: selectedProject.editor_id,
-                        is_proposal: selectedProject.is_proposal
-                    }}
-                    userRole={profile?.role as any}
-                    userId={user?.id || ''}
-                    onClose={() => setShowFilesModal(false)}
-                    onRefresh={refreshProjectData}
-                    onPreviewVideo={(file) => {
-                        setPreviewFile(file);
-                        setShowFilesModal(false);
-                    }}
-                />
+
+            {
+                showFilesModal && selectedProject && (
+                    <ProjectFilesModal
+                        project={{
+                            id: selectedProject.project_id || selectedProject.id,
+                            title: selectedProject.title,
+                            project_files: selectedProject.project_files,
+                            ryver_link: selectedProject.ryver_link,
+                            editor_id: selectedProject.editor_id,
+                            is_proposal: selectedProject.is_proposal
+                        }}
+                        userRole={profile?.role as any}
+                        userId={user?.id || ''}
+                        onClose={() => setShowFilesModal(false)}
+                        onRefresh={refreshProjectData}
+                        onPreviewVideo={(file) => {
+                            setPreviewFile(file);
+                            setShowFilesModal(false);
+                        }}
+                    />
+                )
+            }
+
+            {showCounterModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="glass" style={{ maxWidth: '400px', width: '100%', borderRadius: '24px', padding: '32px', border: '1px solid var(--glass-border)', background: 'var(--bg-deep)' }}>
+                        <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', fontWeight: 800 }}>Nova Contraproposta</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>Sugira um novo valor para este projeto. O outro participante será notificado.</p>
+
+                        <div style={{ position: 'relative', marginBottom: '24px' }}>
+                            <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--accent)' }}>R$</span>
+                            <input
+                                type="number"
+                                value={counterPrice}
+                                onChange={(e) => setCounterPrice(e.target.value)}
+                                placeholder="Valor"
+                                style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--accent)', color: 'white', fontSize: '1.2rem', fontWeight: 800, outline: 'none' }} />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button onClick={() => setShowCounterModal(null)} style={{ flex: 1, padding: '14px', borderRadius: '14px', background: 'none', border: '1px solid var(--glass-border)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+                            <button
+                                onClick={handleSendCounterOfferFromChat}
+                                disabled={!!isActionLoading || !counterPrice}
+                                style={{
+                                    flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
+                                    background: 'linear-gradient(135deg, #07b6d5, #6366f1)',
+                                    color: 'white', fontWeight: 700, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                    opacity: (!counterPrice || isActionLoading) ? 0.5 : 1
+                                }}
+                            >
+                                {isActionLoading === showCounterModal.id ? <Loader2 className="animate-spin" size={18} /> : <><Send size={18} /> Enviar</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
+
             <style>{`
-                .chat-item-hover:hover {
-                    background: rgba(0, 0, 0, 0.05) !important;
-                }
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                @keyframes pulse {
-                    0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(7, 182, 213, 0.4); }
-                    70% { transform: scale(1.1); opacity: 0.8; box-shadow: 0 0 0 10px rgba(7, 182, 213, 0); }
-                    100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(7, 182, 213, 0); }
-                }
-                ::-webkit-scrollbar { width: 6px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
-                ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.1); }
-            `}</style>
+            .chat-item-hover:hover {
+                background: rgba(0, 0, 0, 0.05) !important;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(7, 182, 213, 0.4); }
+                70% { transform: scale(1.1); opacity: 0.8; box-shadow: 0 0 0 10px rgba(7, 182, 213, 0); }
+                100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(7, 182, 213, 0); }
+            }
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.1); }
+        `}</style>
         </div>
     );
 };

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { 
-    User, Eye, EyeOff, 
-    ChevronRight, ChevronLeft, Upload, Check, 
-    Loader2, Video, Trash2, Plus, X, Briefcase 
+import { useNavigate } from 'react-router-dom';
+import {
+    User, Eye, EyeOff,
+    ChevronRight, ChevronLeft, Upload, Check,
+    Loader2, Plus, X, Briefcase
 } from 'lucide-react';
 import Logo from '../../components/common/Logo';
 import { supabase } from '../../services/supabase';
@@ -44,6 +44,11 @@ const EditorRegistrationPage: React.FC = () => {
         portfolioFiles: [] as File[]
     });
 
+    const [portfolioUploads, setPortfolioUploads] = useState<{ [key: number]: { status: 'idle' | 'uploading' | 'done' | 'error', error?: string } }>({});
+    const [uploadedPortfolioUrls, setUploadedPortfolioUrls] = useState<string[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
     const softOptions = ['Premiere Pro', 'After Effects', 'Final Cut', 'CapCut', 'DaVinci Resolve', 'Sony Vegas', 'Photoshop', 'Canva'];
     const formatOptions = ['Shorts/Reels/TikTok', 'YouTube Longo', 'Institucional', 'Vlogs', 'Podcasts', 'Anúncios/Ads', 'Documentários'];
     const skillsOptions = ['Estratégia', 'Redação', 'Análise', 'Design', 'Edição de Vídeos', 'Motion Graphics', 'Copywriting'];
@@ -73,8 +78,16 @@ const EditorRegistrationPage: React.FC = () => {
     const handlePortfolioFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
-            setFormData(prev => ({ 
-                ...prev, 
+
+            // Check for large files (> 100MB)
+            const largeFile = filesArray.find(f => f.size > 100 * 1024 * 1024);
+            if (largeFile) {
+                setError(`O arquivo "${largeFile.name}" é muito grande (maior que 100MB). Para um upload mais estável, use vídeos mais leves.`);
+                return;
+            }
+
+            setFormData(prev => ({
+                ...prev,
                 portfolioFiles: [...prev.portfolioFiles, ...filesArray].slice(0, 5) // Limit to 5
             }));
         }
@@ -87,7 +100,121 @@ const EditorRegistrationPage: React.FC = () => {
         }));
     };
 
-    const nextStep = () => setStep(prev => prev + 1);
+    const nextStep = async () => {
+        setError(null);
+
+        // Finalize auth early at Step 1 to get userId for storage
+        if (step === 1) {
+            setLoading(true);
+            try {
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (!sessionData.session?.user) {
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email: formData.email,
+                        password: formData.password,
+                        options: {
+                            data: {
+                                full_name: formData.fullName,
+                                phone: formData.phone,
+                            }
+                        }
+                    });
+                    if (authError) throw authError;
+                    if (!authData.user) throw new Error('Falha ao criar conta.');
+                }
+                setStep(prev => prev + 1);
+            } catch (err: any) {
+                setError(err.message === 'User already registered' ? 'Este e-mail já está em uso.' : err.message);
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        // Upload portfolio videos before Step 5
+        if (step === 4) {
+            const hasLink = !!formData.portfolioLinks.trim();
+            const hasFiles = formData.portfolioFiles.length > 0;
+
+            if (!hasLink && !hasFiles) {
+                setError('Por favor, forneça o link do seu portfólio (Google Drive, Behance, etc.) OU envie pelo menos um vídeo.');
+                return;
+            }
+
+            // Uploading files if present
+            if (hasFiles) {
+                setIsUploading(true);
+                try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) throw new Error('Sessão expirada. Por favor, recarregue a página.');
+
+                    const paths: string[] = [...uploadedPortfolioUrls];
+                    let i = 0;
+                    for (const file of formData.portfolioFiles) {
+                        const currentStatus = portfolioUploads[i]?.status;
+                        if (currentStatus === 'done') {
+                            i++;
+                            continue;
+                        }
+
+                        setUploadingIndex(i);
+                        setPortfolioUploads(prev => ({ ...prev, [i]: { status: 'uploading' } }));
+
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${user.id}-portfolio-${i}.${fileExt}`;
+
+                        let uploaded = false;
+                        let retries = 0;
+                        const maxRetries = 2; // total 3 attempts
+
+                        while (!uploaded && retries <= maxRetries) {
+                            try {
+                                const { data, error: uploadError } = await supabase.storage
+                                    .from('editor-portfolio')
+                                    .upload(`${user.id}/${fileName}`, file, { upsert: true });
+
+                                if (uploadError) throw uploadError;
+
+                                setPortfolioUploads(prev => ({ ...prev, [i]: { status: 'done' } }));
+                                if (data?.path) paths.push(data.path);
+                                uploaded = true;
+                            } catch (err: any) {
+                                console.error(`[Upload Retry ${retries}] Video ${i + 1}:`, err);
+                                if (retries === maxRetries) {
+                                    setPortfolioUploads(prev => ({ ...prev, [i]: { status: 'error', error: err.message } }));
+                                    throw new Error(`Vídeo ${i + 1} falhou após 3 tentativas: ${err.message}`);
+                                }
+                                retries++;
+                                // Small delay before retry
+                                await new Promise(r => setTimeout(r, 1000 * retries));
+                            }
+                        }
+                        i++;
+                    }
+                    setUploadedPortfolioUrls(paths);
+                } catch (err: any) {
+                    setError(`Erro no upload: ${err.message}. Tente reduzir o tamanho dos vídeos ou envie apenas o link.`);
+                    console.error('[PortfolioUpload] Error:', err);
+                    setIsUploading(false);
+                    return; // Fail step if upload failed (user must fix or remove files)
+                } finally {
+                    setIsUploading(false);
+                    setUploadingIndex(null);
+                }
+            }
+
+            setStep(prev => prev + 1);
+            return;
+        }
+
+        setStep(prev => prev + 1);
+    };
+
+    // Rename loading to isLoading for clarity if needed, or stick to loading
+    // The previous state was 'loading', but 'setIsLoading' was used in my replacement.
+    // Let me check the original state name.
+    // Line 14: const [loading, setLoading] = useState(false);
+    // Correcting to setLoading.
     const prevStep = () => setStep(prev => prev - 1);
 
     const handleSubmit = async () => {
@@ -95,56 +222,24 @@ const EditorRegistrationPage: React.FC = () => {
         setError(null);
 
         try {
-            console.log('[handleSubmit] Starting registration process...');
-            
-            // 1. Auth/User Check
-            let userId = '';
-            
-            // Check if user is already logged in
+            console.log('[handleSubmit] Starting final stage...');
+
             const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData.session?.user) {
-                console.log('[handleSubmit] User already logged in:', sessionData.session.user.id);
-                userId = sessionData.session.user.id;
-            } else {
-                console.log('[handleSubmit] Creating new auth user...');
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: formData.email,
-                    password: formData.password,
-                    options: {
-                        data: {
-                            full_name: formData.fullName,
-                            phone: formData.phone,
-                        }
-                    }
-                });
+            const userId = sessionData.session?.user?.id;
+            if (!userId) throw new Error('Sessão não encontrada.');
 
-                if (authError) {
-                    if (authError.message === 'User already registered') {
-                        throw new Error('User already registered');
-                    }
-                    throw authError;
-                }
-                if (!authData.user) throw new Error('Falha ao criar usuário.');
-                userId = authData.user.id;
-            }
-
-            console.log('[handleSubmit] Target UserId:', userId);
-
-            // 2. Parallel File Uploads
-            console.log('[handleSubmit] Starting parallel uploads...');
             const uploadPromises = [];
 
             // ID File
             if (formData.idFile) {
                 const file = formData.idFile;
                 const fileExt = file.name.split('.').pop();
-                const fileName = `${userId}-id.${fileExt}`;
                 uploadPromises.push(
                     supabase.storage
                         .from('editor-identity')
-                        .upload(`${userId}/${fileName}`, file, { upsert: true })
+                        .upload(`${userId}/${userId}-id.${fileExt}`, file, { upsert: true })
                         .then(({ data, error }) => {
-                            if (error) throw new Error(`Erro no upload da Identidade: ${error.message}`);
+                            if (error) throw new Error(`Identidade: ${error.message}`);
                             return { type: 'identity', path: data?.path };
                         })
                 );
@@ -154,47 +249,27 @@ const EditorRegistrationPage: React.FC = () => {
             if (formData.faceFile) {
                 const file = formData.faceFile;
                 const fileExt = file.name.split('.').pop();
-                const fileName = `${userId}-face.${fileExt}`;
                 uploadPromises.push(
                     supabase.storage
                         .from('editor-face')
-                        .upload(`${userId}/${fileName}`, file, { upsert: true })
+                        .upload(`${userId}/${userId}-face.${fileExt}`, file, { upsert: true })
                         .then(({ data, error }) => {
-                            if (error) throw new Error(`Erro no upload da Foto do Rosto: ${error.message}`);
+                            if (error) throw new Error(`Foto do Rosto: ${error.message}`);
                             return { type: 'face', path: data?.path };
                         })
                 );
             }
 
-            // Portfolio Videos
-            formData.portfolioFiles.forEach((file, i) => {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${userId}-portfolio-${i}.${fileExt}`;
-                uploadPromises.push(
-                    supabase.storage
-                        .from('editor-portfolio')
-                        .upload(`${userId}/${fileName}`, file, { upsert: true })
-                        .then(({ data, error }) => {
-                            if (error) throw new Error(`Erro no upload do vídeo ${i+1}: ${error.message}`);
-                            return { type: 'portfolio', path: data?.path };
-                        })
-                );
-            });
-
             const uploadResults = await Promise.all(uploadPromises);
-            console.log('[handleSubmit] All uploads completed.');
 
-            let identityUrl = uploadResults.find(r => r.type === 'identity')?.path || '';
-            let faceUrl = uploadResults.find(r => r.type === 'face')?.path || '';
-            const portfolioVideoUrls = uploadResults.filter(r => r.type === 'portfolio').map(r => r.path);
+            const identityUrl = uploadResults.find(r => r.type === 'identity')?.path || '';
+            const faceUrl = uploadResults.find(r => r.type === 'face')?.path || '';
 
             const allPortfolioLinks = [
                 ...(formData.portfolioLinks ? [formData.portfolioLinks] : []),
-                ...portfolioVideoUrls
+                ...uploadedPortfolioUrls
             ];
 
-            // 3. Update Profile
-            console.log('[handleSubmit] Updating profile details...');
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
@@ -215,8 +290,6 @@ const EditorRegistrationPage: React.FC = () => {
                     managed_profiles: [formData.managedProfiles],
                     motivation: formData.motivation,
                     multiple_projects_handling: formData.multipleProjectsHandling,
-                    unique_value: formData.uniqueValue,
-                    additional_comments: formData.additionalComments,
                     identity_doc_url: identityUrl,
                     face_photo_url: faceUrl,
                     onboarding_status: 'pending',
@@ -225,22 +298,11 @@ const EditorRegistrationPage: React.FC = () => {
                 .eq('id', userId);
 
             if (profileError) throw profileError;
-            console.log('[handleSubmit] Profile updated successfully!');
-
-            // 4. Redirect
             navigate('/register/thanks');
 
         } catch (err: any) {
-            console.error('Registration error:', err);
-            if (err.message === 'User already registered') {
-                setError(
-                    <span>
-                        Este e-mail já está cadastrado. <Link to="/login" style={{ color: '#07b6d5', textDecoration: 'underline' }}>Faça login aqui</Link> ou use outro e-mail.
-                    </span>
-                );
-            } else {
-                setError(err.message || 'Ocorreu um erro ao processar sua candidatura.');
-            }
+            console.error('Final stage error:', err);
+            setError(err.message || 'Erro ao finalizar candidatura.');
         } finally {
             setLoading(false);
         }
@@ -269,9 +331,9 @@ const EditorRegistrationPage: React.FC = () => {
 
     return (
         <div className="futuristic-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontFamily: "'Inter', sans-serif", padding: '40px 20px' }}>
-            
+
             <div style={{ width: '100%', maxWidth: '600px', background: 'rgba(5, 5, 5, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
-                
+
                 {/* Progress Bar */}
                 <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', width: '100%' }}>
                     <div style={{ height: '100%', background: 'linear-gradient(90deg, #07b6d5 0%, #8b5cf6 100%)', width: `${(step / 5) * 100}%`, transition: 'width 0.3s ease' }} />
@@ -294,7 +356,7 @@ const EditorRegistrationPage: React.FC = () => {
                     </div>
 
                     <form onSubmit={(e) => e.preventDefault()}>
-                        
+
                         {error && (
                             <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#ef4444', fontSize: '0.9rem', marginBottom: '24px' }}>
                                 {error}
@@ -319,14 +381,14 @@ const EditorRegistrationPage: React.FC = () => {
                                 <div>
                                     <label style={labelStyle}>Senha *</label>
                                     <div style={{ position: 'relative' }}>
-                                        <input 
-                                            name="password" 
-                                            type={showPassword ? "text" : "password"} 
-                                            value={formData.password} 
-                                            onChange={handleInputChange} 
-                                            placeholder="Mínimo 6 caracteres" 
-                                            style={inputStyle} 
-                                            required 
+                                        <input
+                                            name="password"
+                                            type={showPassword ? "text" : "password"}
+                                            value={formData.password}
+                                            onChange={handleInputChange}
+                                            placeholder="Mínimo 6 caracteres"
+                                            style={inputStyle}
+                                            required
                                         />
                                         <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -357,7 +419,7 @@ const EditorRegistrationPage: React.FC = () => {
                                     <label style={labelStyle}>Quais softwares você domina? *</label>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginTop: '8px' }}>
                                         {softOptions.map(opt => (
-                                            <button 
+                                            <button
                                                 key={opt}
                                                 type="button"
                                                 onClick={() => handleCheckboxChange('softwareSkills', opt)}
@@ -384,7 +446,7 @@ const EditorRegistrationPage: React.FC = () => {
                                     <label style={labelStyle}>Você edita quais formatos de vídeo? *</label>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginTop: '8px' }}>
                                         {formatOptions.map(opt => (
-                                            <button 
+                                            <button
                                                 key={opt}
                                                 type="button"
                                                 onClick={() => handleCheckboxChange('videoFormats', opt)}
@@ -409,7 +471,7 @@ const EditorRegistrationPage: React.FC = () => {
                                     <label style={labelStyle}>Outras Habilidades</label>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
                                         {skillsOptions.map(opt => (
-                                            <button 
+                                            <button
                                                 key={opt}
                                                 type="button"
                                                 onClick={() => handleCheckboxChange('additionalSkills', opt)}
@@ -433,33 +495,150 @@ const EditorRegistrationPage: React.FC = () => {
                         {step === 4 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <Briefcase size={18} color="#07b6d5" /> Portfólio de Trabalho *
                                     </h4>
-                                    
+                                    <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '20px' }}>
+                                        Mostre seus melhores trabalhos. Você pode enviar links ou subir os arquivos diretamente (máx. 50MB por vídeo).
+                                    </p>
+
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                         <div>
-                                            <label style={labelStyle}>Links Externos (Behance, YouTube, Drive...)</label>
+                                            <label style={labelStyle}>Opcional: Links Externos (Google Drive, Behance, YouTube...)</label>
                                             <input name="portfolioLinks" value={formData.portfolioLinks} onChange={handleInputChange} placeholder="https://..." style={inputStyle} />
                                         </div>
 
-                                        <div style={{ textAlign: 'center', padding: '12px', color: '#666', fontSize: '0.8rem' }}>— OU —</div>
+                                        <div style={{ textAlign: 'center', padding: '12px', color: '#07b6d5', fontSize: '0.9rem', fontWeight: 700 }}>— OU —</div>
 
                                         <div>
-                                            <label style={labelStyle}>Subir Vídeos (No mínimo 3 vídeos obrigatórios) *</label>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '12px' }}>
-                                                {formData.portfolioFiles.map((file, index) => (
-                                                    <div key={index} style={{ position: 'relative', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(7, 182, 213, 0.3)' }}>
-                                                        <Video size={24} color="#07b6d5" />
-                                                        <button onClick={() => removePortfolioFile(index)} style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', border: 'none', borderRadius: '50%', width: '18px', height: '18px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                            <X size={12} />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                            <label style={labelStyle}>Opcional: Subir Vídeos (máx. 50MB cada)</label>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                gap: '16px',
+                                                marginTop: '8px'
+                                            }}>
+                                                {formData.portfolioFiles.map((file, index) => {
+                                                    const uploadStatus = portfolioUploads[index]?.status || 'idle';
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            style={{
+                                                                position: 'relative',
+                                                                height: '110px',
+                                                                background: 'rgba(255,255,255,0.05)',
+                                                                borderRadius: '12px',
+                                                                overflow: 'hidden',
+                                                                border: uploadStatus === 'error' ? '2px solid #ef4444' : uploadStatus === 'done' ? '2px solid #22c55e' : '2px solid rgba(7, 182, 213, 0.4)',
+                                                                transition: 'all 0.3s ease'
+                                                            }}
+                                                        >
+                                                            <video
+                                                                src={URL.createObjectURL(file)}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: 'cover',
+                                                                    opacity: uploadStatus === 'uploading' ? 0.3 : 0.8
+                                                                }}
+                                                                onMouseOver={e => {
+                                                                    e.currentTarget.play().catch(() => { });
+                                                                    e.currentTarget.style.opacity = '1';
+                                                                }}
+                                                                onMouseOut={e => {
+                                                                    e.currentTarget.pause();
+                                                                    e.currentTarget.style.opacity = '0.8';
+                                                                }}
+                                                                muted
+                                                                loop
+                                                            />
+
+                                                            {uploadStatus === 'uploading' && (
+                                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
+                                                                    <Loader2 size={24} className="animate-spin" color="#07b6d5" />
+                                                                </div>
+                                                            )}
+
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: '6px',
+                                                                left: '6px',
+                                                                background: uploadStatus === 'error' ? '#ef4444' : uploadStatus === 'done' ? '#22c55e' : 'rgba(7, 182, 213, 0.9)',
+                                                                color: '#fff',
+                                                                fontSize: '0.55rem',
+                                                                padding: '2px 6px',
+                                                                borderRadius: '4px',
+                                                                fontWeight: 800,
+                                                                pointerEvents: 'none',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}>
+                                                                {uploadStatus === 'done' ? <Check size={10} /> : uploadStatus === 'error' ? <X size={10} /> : null}
+                                                                {uploadStatus === 'done' ? 'ENVIADO' : uploadStatus === 'error' ? 'ERRO' : uploadStatus === 'uploading' ? 'SUBINDO...' : `VÍDEO ${index + 1}`}
+                                                            </div>
+
+                                                            {uploadStatus !== 'uploading' && uploadStatus !== 'done' && (
+                                                                <button
+                                                                    onClick={() => removePortfolioFile(index)}
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        top: '6px',
+                                                                        right: '6px',
+                                                                        background: 'rgba(239, 68, 68, 0.9)',
+                                                                        border: 'none',
+                                                                        borderRadius: '50%',
+                                                                        width: '20px',
+                                                                        height: '20px',
+                                                                        color: '#fff',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                                                        zIndex: 10
+                                                                    }}
+                                                                >
+                                                                    <X size={12} />
+                                                                </button>
+                                                            )}
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                bottom: 0,
+                                                                left: 0,
+                                                                right: 0,
+                                                                background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                                                                padding: '4px 8px',
+                                                                fontSize: '0.6rem',
+                                                                color: '#ddd',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                pointerEvents: 'none'
+                                                            }}>
+                                                                {file.name}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                                 {formData.portfolioFiles.length < 5 && (
-                                                    <label style={{ height: '80px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.2s' }} className="hover-border-primary">
+                                                    <label style={{
+                                                        height: '110px',
+                                                        background: 'rgba(255,255,255,0.02)',
+                                                        borderRadius: '12px',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '8px',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        border: '2px dashed rgba(255,255,255,0.1)',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                        color: '#666'
+                                                    }} className="hover-border-primary">
                                                         <input type="file" accept="video/*" multiple onChange={handlePortfolioFilesChange} style={{ display: 'none' }} />
-                                                        <Plus size={24} color="#666" />
+                                                        <Plus size={28} />
+                                                        <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>Adicionar Vídeo</span>
                                                     </label>
                                                 )}
                                             </div>
@@ -489,25 +668,25 @@ const EditorRegistrationPage: React.FC = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     {/* ID FILE */}
-                                    <div style={{ 
-                                        padding: '40px 24px', textAlign: 'center', 
-                                        background: 'rgba(7, 182, 213, 0.03)', 
-                                        border: '2px dashed rgba(7, 182, 213, 0.2)', 
-                                        borderRadius: '16px', position: 'relative' 
+                                    <div style={{
+                                        padding: '40px 24px', textAlign: 'center',
+                                        background: 'rgba(7, 182, 213, 0.03)',
+                                        border: '2px dashed rgba(7, 182, 213, 0.2)',
+                                        borderRadius: '16px', position: 'relative'
                                     }}>
-                                        <input 
-                                            type="file" 
-                                            accept="image/*,application/pdf" 
+                                        <input
+                                            type="file"
+                                            accept="image/*,application/pdf"
                                             onChange={(e) => handleFileChange(e, 'idFile')}
                                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                                         />
                                         {formData.idFile ? (
                                             <div style={{ color: '#22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                                                 {formData.idFile.type.startsWith('image/') ? (
-                                                    <img 
-                                                        src={URL.createObjectURL(formData.idFile)} 
-                                                        alt="Preview" 
-                                                        style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} 
+                                                    <img
+                                                        src={URL.createObjectURL(formData.idFile)}
+                                                        alt="Preview"
+                                                        style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }}
                                                     />
                                                 ) : <Check size={32} />}
                                                 <p style={{ fontWeight: 600, fontSize: '0.8rem' }}>Identidade OK</p>
@@ -521,24 +700,24 @@ const EditorRegistrationPage: React.FC = () => {
                                     </div>
 
                                     {/* FACE FILE */}
-                                    <div style={{ 
-                                        padding: '40px 24px', textAlign: 'center', 
-                                        background: 'rgba(139, 92, 246, 0.03)', 
-                                        border: '2px dashed rgba(139, 92, 246, 0.2)', 
-                                        borderRadius: '16px', position: 'relative' 
+                                    <div style={{
+                                        padding: '40px 24px', textAlign: 'center',
+                                        background: 'rgba(139, 92, 246, 0.03)',
+                                        border: '2px dashed rgba(139, 92, 246, 0.2)',
+                                        borderRadius: '16px', position: 'relative'
                                     }}>
-                                        <input 
-                                            type="file" 
-                                            accept="image/*" 
+                                        <input
+                                            type="file"
+                                            accept="image/*"
                                             onChange={(e) => handleFileChange(e, 'faceFile')}
                                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                                         />
                                         {formData.faceFile ? (
                                             <div style={{ color: '#22c55e', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                                <img 
-                                                    src={URL.createObjectURL(formData.faceFile)} 
-                                                    alt="Preview" 
-                                                    style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }} 
+                                                <img
+                                                    src={URL.createObjectURL(formData.faceFile)}
+                                                    alt="Preview"
+                                                    style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
                                                 />
                                                 <p style={{ fontWeight: 600, fontSize: '0.8rem' }}>Foto do Rosto OK</p>
                                             </div>
@@ -567,13 +746,19 @@ const EditorRegistrationPage: React.FC = () => {
                                 </button>
                             )}
                             {step < 5 ? (
-                                <button type="button" onClick={nextStep} 
-                                    disabled={step === 4 && formData.portfolioFiles.length < 3}
-                                    style={{ 
-                                        flex: 2, padding: '14px', borderRadius: '12px', background: '#fff', color: '#000', border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                        opacity: (step === 4 && formData.portfolioFiles.length < 3) ? 0.3 : 1
+                                <button type="button" onClick={nextStep}
+                                    disabled={isUploading || loading}
+                                    style={{
+                                        flex: 2, padding: '14px', borderRadius: '12px', background: '#fff', color: '#000', border: 'none', fontWeight: 800, cursor: (isUploading || loading) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                        opacity: (isUploading || loading) ? 0.3 : 1
                                     }}>
-                                    Próximo Passo <ChevronRight size={18} />
+                                    {isUploading ? (
+                                        <>Subindo Vídeo {uploadingIndex !== null ? uploadingIndex + 1 : '...'} de {formData.portfolioFiles.length}... <Loader2 className="animate-spin" size={18} /></>
+                                    ) : loading ? (
+                                        <>Verificando... <Loader2 className="animate-spin" size={18} /></>
+                                    ) : (
+                                        <>Próximo Passo <ChevronRight size={18} /></>
+                                    )}
                                 </button>
                             ) : (
                                 <button type="button" onClick={handleSubmit} disabled={loading || !formData.idFile || !formData.faceFile} style={{ flex: 2, padding: '14px', borderRadius: '12px', background: 'linear-gradient(90deg, #07b6d5 0%, #8b5cf6 100%)', color: '#fff', border: 'none', fontWeight: 800, cursor: (loading || !formData.idFile || !formData.faceFile) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (loading || !formData.idFile || !formData.faceFile) ? 0.7 : 1 }}>
@@ -601,6 +786,11 @@ const EditorRegistrationPage: React.FC = () => {
                     linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
                     linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
                     background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+                }
+                .hover-border-primary:hover {
+                    border-color: rgba(7, 182, 213, 0.5) !important;
+                    background: rgba(255,255,255,0.05) !important;
+                    color: #07b6d5 !important;
                 }
             `}</style>
         </div>

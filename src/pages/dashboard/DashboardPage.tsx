@@ -79,7 +79,13 @@ const DashboardPage: React.FC = () => {
 
                 {/* Admin Only Routes */}
                 {role === 'admin' && (
-                    <Route path="admin" element={<AdminDashboard />} />
+                    <>
+                        <Route path="admin" element={<AdminDashboard />} />
+                        <Route path="admin/leads" element={<AdminDashboard />} />
+                        <Route path="admin/clients" element={<AdminDashboard />} />
+                        <Route path="admin/editors" element={<AdminDashboard />} />
+                        <Route path="admin/crm" element={<AdminDashboard />} />
+                    </>
                 )}
 
                 {/* Catch-all to default dashboard */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
     Search, Filter, Star, CheckCircle2, 
-    ArrowRight, MapPin, Award, PlayCircle, Loader2 
+    ArrowRight, Award, Loader2 
 } from 'lucide-react';
 import Logo from '../components/common/Logo';
 import { supabase } from '../services/supabase';

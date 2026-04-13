@@ -72,8 +72,6 @@ const ProjectFilesModal: React.FC<ProjectFilesModalProps> = ({ project, userRole
         setError(null);
 
         try {
-            const currentFiles = project.project_files || [];
-            const newFiles = [...currentFiles];
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];

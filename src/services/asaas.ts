@@ -126,5 +126,13 @@ export const asaasService = {
     })
     if (error) throw error
     return data
+  },
+
+  async getSystemBalance() {
+    const { data, error } = await supabase.functions.invoke('asaas-integration', {
+      body: { action: 'admin-get-balance' }
+    })
+    if (error) throw error
+    return data
   }
 }

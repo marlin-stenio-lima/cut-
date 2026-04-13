@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { CheckCircle, ArrowLeft, Clock, XCircle, LogOut } from 'lucide-react';
 import Logo from '../../components/common/Logo';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../services/supabase';
 
 const EditorThanksPage: React.FC = () => {
     const { profile, signOut } = useAuth();
