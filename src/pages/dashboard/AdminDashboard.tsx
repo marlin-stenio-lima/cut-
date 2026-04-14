@@ -979,64 +979,74 @@ const AdminDashboard: React.FC = () => {
 
             {/* ─── Modal: Viewing Contact ─── */}
             {viewingContact && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
-                    <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}>
+                    <div className="w-full max-w-2xl rounded-[32px] overflow-hidden max-h-[90vh] flex flex-col shadow-2xl transition-all" style={{ background: '#09090b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 80px rgba(0,0,0,0.8)' }}>
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                            <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold"
-                                    style={{ background: viewingContact.role === 'client' ? 'var(--secondary)' : 'var(--primary)', fontSize: 16 }}>
+                        <div className="flex items-center justify-between px-8 py-6 flex-shrink-0 relative overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)' }}>
+                            <div className="flex items-center gap-5 relative z-10">
+                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg"
+                                    style={{ background: viewingContact.role === 'client' ? 'var(--secondary)' : 'var(--primary)', fontSize: 24 }}>
                                     {viewingContact.full_name?.[0]?.toUpperCase() || '?'}
                                 </div>
-                                <div>
-                                    <p className="font-semibold" style={{ color: 'var(--text-main)' }}>{viewingContact.full_name || '—'}</p>
-                                    <p className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
-                                        {viewingContact.role === 'client' ? 'Cliente' : 'Editor'}
-                                        {viewingContact.onboarding_status === 'approved' && ' · Ativo'}
-                                        {viewingContact.onboarding_status === 'pending' && ' · Pendente'}
-                                        {viewingContact.onboarding_status === 'rejected' && ' · Recusado'}
-                                    </p>
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>{viewingContact.full_name || 'Usuário Sem Nome'}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)' }}>
+                                            {viewingContact.role === 'client' ? 'Cliente' : 'Editor'}
+                                        </span>
+                                        {viewingContact.onboarding_status === 'approved' && <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>Ativo</span>}
+                                        {viewingContact.onboarding_status === 'pending' && <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308' }}>Pendente</span>}
+                                        {viewingContact.onboarding_status === 'rejected' && <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>Recusado</span>}
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={() => setViewingContact(null)} style={{ color: 'var(--text-muted)' }} className="hover:opacity-60">
+                            <button onClick={() => setViewingContact(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors z-10 text-white/50 hover:text-white">
                                 <X size={20} />
                             </button>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="overflow-y-auto flex-1 p-6 flex flex-col gap-6">
+                        <div className="overflow-y-auto flex-1 p-8 flex flex-col gap-8 custom-scrollbar">
                             {/* Contact Info */}
-                            <div className="flex flex-col gap-2">
-                                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Contato</p>
+                            <div className="flex flex-col gap-4">
+                                <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Contato</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Mail size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                            <Mail size={18} style={{ color: 'var(--primary)' }} />
+                                        </div>
                                         <div className="min-w-0">
-                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Email</p>
-                                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || '—'}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Email</p>
+                                            <p className="text-[15px] font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || '—'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Phone size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                            <Phone size={18} style={{ color: 'var(--primary)' }} />
+                                        </div>
                                         <div>
-                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>WhatsApp</p>
-                                            <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.whatsapp || '—'}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>WhatsApp</p>
+                                            <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.whatsapp || '—'}</p>
                                         </div>
                                     </div>
                                     {viewingContact.location && (
-                                        <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                        <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                <MapPin size={18} style={{ color: 'var(--primary)' }} />
+                                            </div>
                                             <div>
-                                                <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Localização</p>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.location}</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Localização</p>
+                                                <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.location}</p>
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Calendar size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                            <Calendar size={18} style={{ color: 'var(--primary)' }} />
+                                        </div>
                                         <div>
-                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Membro desde</p>
-                                            <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Membro desde</p>
+                                            <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>
                                                 {viewingContact.created_at ? new Date(viewingContact.created_at).toLocaleDateString('pt-BR') : '—'}
                                             </p>
                                         </div>
@@ -1048,19 +1058,16 @@ const AdminDashboard: React.FC = () => {
                             {viewingContact.role === 'editor' && (
                                 <>
                                     {/* Skills & Experience */}
-                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2">
-                                            <Star size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Habilidades e Experiência</span>
-                                        </div>
-                                        <div className="flex flex-col gap-5">
+                                    <div className="flex flex-col gap-4">
+                                        <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Habilidades e Experiência</p>
+                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                             {viewingContact.software_skills?.length > 0 && (
                                                 <div>
-                                                    <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Softwares Dominados</p>
-                                                    <div className="flex flex-wrap gap-2">
+                                                    <p className="text-[11px] font-medium text-white/50 mb-3">Softwares Dominados</p>
+                                                    <div className="flex flex-wrap gap-2.5">
                                                         {viewingContact.software_skills.map((s: string) => (
-                                                            <span key={s} className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                                                                style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                            <span key={s} className="px-3.5 py-1.5 rounded-xl text-[13px] font-semibold"
+                                                                style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
                                                                 {s}
                                                             </span>
                                                         ))}
@@ -1069,113 +1076,106 @@ const AdminDashboard: React.FC = () => {
                                             )}
                                             {viewingContact.editing_experience && (
                                                 <div>
-                                                    <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Tempo de Experiência</p>
-                                                    <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
+                                                    <p className="text-[11px] font-medium text-white/50 mb-1.5">Tempo de Experiência</p>
+                                                    <p className="text-[15px] max-w-2xl text-white/90 leading-relaxed">{viewingContact.editing_experience}</p>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* Availability & Price */}
-                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2">
-                                            <Clock size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Disponibilidade & Valores</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Horas dedicadas/semana</p>
-                                                <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability || '—'}</p>
+                                    <div className="flex flex-col gap-4">
+                                        <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Disponibilidade & Valores</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                    <Clock size={18} style={{ color: 'var(--primary)' }} />
+                                                </div>
+                                                <p className="text-[11px] font-medium text-white/50 mb-1">Horas dedicadas/semana</p>
+                                                <p className="text-[16px] font-semibold text-white/90">{viewingContact.weekly_availability || '—'}</p>
                                             </div>
-                                            <div>
-                                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão de Ganhos</p>
-                                                <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation || '—'}</p>
+                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                    <DollarSign size={18} style={{ color: 'var(--primary)' }} />
+                                                </div>
+                                                <p className="text-[11px] font-medium text-white/50 mb-1">Pretensão de Ganhos</p>
+                                                <p className="text-[16px] font-semibold text-white/90">{viewingContact.price_expectation || '—'}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Portfolio and Motivation */}
-                                    <div className="p-5 rounded-2xl flex flex-col gap-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2">
-                                            <Code size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Portfólio & Perfil Comportamental</span>
+                                    <div className="flex flex-col gap-4">
+                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            {viewingContact.portfolio_url && (
+                                                <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
+                                                    className="flex items-center justify-between px-6 py-5 rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.01]"
+                                                    style={{ background: 'var(--primary)', color: 'white', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>
+                                                    <span>Acessar Portfólio do Contato</span>
+                                                    <ExternalLink size={18} />
+                                                </a>
+                                            )}
+                                            {viewingContact.motivation && (
+                                                <div>
+                                                    <p className="text-[11px] font-medium text-white/50 mb-2">Motivação Pessoal</p>
+                                                    <div className="p-5 rounded-2xl" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)' }}>
+                                                        <p className="text-[14px] text-white/80 leading-relaxed italic">"{viewingContact.motivation}"</p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        {viewingContact.portfolio_url && (
-                                            <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
-                                                className="flex items-center justify-between px-5 py-4 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-                                                style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--primary)', textDecoration: 'none', display: 'flex' }}>
-                                                <span>Acessar Portfólio Externo</span>
-                                                <ExternalLink size={15} />
-                                            </a>
-                                        )}
-                                        {viewingContact.motivation && (
-                                            <div>
-                                                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Motivação Pessoal</p>
-                                                <p className="text-[14px] p-4 rounded-xl leading-relaxed" style={{ color: 'var(--text-main)', background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
-                                                    {viewingContact.motivation}
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Bank Information (PIX) */}
-                                    <div className="p-5 rounded-2xl flex items-center gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
-                                            <DollarSign size={24} style={{ color: '#10b981' }} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Chave PIX (Para Saques)</p>
-                                            <p className="text-[16px] font-bold mt-1" style={{ color: 'var(--text-main)' }}>
-                                                {viewingContact.pix_key ? `${viewingContact.pix_key_type || ''} - ${viewingContact.pix_key}` : 'Informação pendente ou via Asaas centralizado'}
-                                            </p>
+                                    <div className="flex flex-col gap-4">
+                                        <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Financeiro</p>
+                                        <div className="p-6 rounded-3xl flex items-center gap-5" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16, 185, 129, 0.15)', boxShadow: '0 8px 24px rgba(16, 185, 129, 0.2)' }}>
+                                                <DollarSign size={26} style={{ color: '#10b981' }} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-green-500/70 mb-1">Chave PIX (Para Saques)</p>
+                                                <p className="text-xl font-bold tracking-tight text-white/90">
+                                                    {viewingContact.pix_key ? `${viewingContact.pix_key_type || ''} - ${viewingContact.pix_key}` : 'Informação pendente / Asaas'}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Documents */}
                                     {(editorUrls.identity || editorUrls.face) && (
-                                        <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <div className="flex items-center gap-2">
-                                                <Shield size={16} style={{ color: 'var(--primary)' }} />
-                                                <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Documentação & Segurança</span>
+                                        <div className="flex flex-col gap-4">
+                                            <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Documentação & Segurança</p>
+                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    {editorUrls.identity ? (
+                                                        <div className="flex flex-col gap-3">
+                                                            <p className="text-[11px] font-medium text-white/50">Documento Oficial</p>
+                                                            <div className="rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40 h-48 flex items-center justify-center">
+                                                                <img src={editorUrls.identity} alt="Doc" className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-3">
+                                                            <p className="text-[11px] font-medium text-white/50">Documento Oficial</p>
+                                                            <div className="h-48 rounded-2xl flex items-center justify-center text-xs" style={{ background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>Sem doc.</div>
+                                                        </div>
+                                                    )}
+                                                    {editorUrls.face ? (
+                                                        <div className="flex flex-col gap-3">
+                                                            <p className="text-[11px] font-medium text-white/50">Selfie (Prova de vida)</p>
+                                                            <div className="rounded-2xl overflow-hidden border border-white/10 relative group bg-black/40 h-48 flex items-center justify-center">
+                                                                <img src={editorUrls.face} alt="Selfie" className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-3">
+                                                            <p className="text-[11px] font-medium text-white/50">Selfie (Prova de vida)</p>
+                                                            <div className="h-48 rounded-2xl flex items-center justify-center text-xs" style={{ background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>Sem selfie</div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-5">
-                                                {editorUrls.identity ? (
-                                                    <div>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Documento Oficial (Frente/Verso)</p>
-                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-40 object-cover rounded-xl border border-white/10" style={{ background: 'var(--bg-deep)' }} />
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-40 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem documento enviado</div>
-                                                )}
-                                                {editorUrls.face ? (
-                                                    <div>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Selfie (Prova de vida)</p>
-                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-40 object-cover rounded-xl border border-white/10" style={{ background: 'var(--bg-deep)' }} />
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-40 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie enviada</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Approval Actions placed at the bottom for easy access */}
-                                    {viewingContact.onboarding_status === 'pending' && (
-                                        <div className="flex gap-4 pt-4 mt-2 border-t" style={{ borderColor: 'var(--glass-border)' }}>
-                                            <button
-                                                onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
-                                                className="flex-1 py-4 rounded-xl font-bold transition-all hover:opacity-80"
-                                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                                            >
-                                                RECUSAR PERFIL
-                                            </button>
-                                            <button
-                                                onClick={() => { handleApproveEditor(viewingContact.id); setViewingContact(null); }}
-                                                className="flex-1 py-4 rounded-xl font-bold text-white transition-all hover:opacity-80"
-                                                style={{ background: '#10b981', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
-                                            >
-                                                APROVAR EDITOR
-                                            </button>
                                         </div>
                                     )}
 
@@ -1185,11 +1185,31 @@ const AdminDashboard: React.FC = () => {
                                             href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white w-full transition-all hover:opacity-80"
-                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
+                                            className="flex items-center justify-center gap-3 py-5 rounded-2xl text-[16px] font-bold text-white w-full transition-all hover:opacity-90 hover:scale-[1.01]"
+                                            style={{ background: '#25D366', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 24px rgba(37, 211, 102, 0.3)' }}
                                         >
-                                            <MessageSquare size={18} /> Iniciar Conversa no WhatsApp
+                                            <MessageSquare size={22} /> Iniciar Conversa no WhatsApp
                                         </a>
+                                    )}
+
+                                    {/* Approval Actions */}
+                                    {viewingContact.onboarding_status === 'pending' && (
+                                        <div className="flex gap-4 pt-4">
+                                            <button
+                                                onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
+                                                className="flex-1 py-5 rounded-2xl text-[15px] font-bold transition-all hover:bg-red-500/10"
+                                                style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                            >
+                                                RECUSAR PERFIL
+                                            </button>
+                                            <button
+                                                onClick={() => { handleApproveEditor(viewingContact.id); setViewingContact(null); }}
+                                                className="flex-1 py-5 rounded-2xl text-[15px] font-bold text-white transition-all hover:scale-[1.02]"
+                                                style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 12px 24px rgba(16, 185, 129, 0.3)' }}
+                                            >
+                                                APROVAR EDITOR
+                                            </button>
+                                        </div>
                                     )}
                                 </>
                             )}
@@ -1198,49 +1218,49 @@ const AdminDashboard: React.FC = () => {
                             {viewingContact.role === 'client' && (
                                 <>
                                     {/* Wallet Management */}
-                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2">
-                                            <DollarSign size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Carteira do Cliente</span>
-                                        </div>
-                                        <div className="p-4 rounded-xl flex flex-col gap-1" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
-                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Saldo Atual Disponível</p>
-                                            <p className="text-3xl font-bold" style={{ color: 'var(--text-main)' }}>
-                                                R$ {(Number(viewingContact.balance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-2">
-                                            <div className="relative flex-1">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium" style={{ color: 'var(--text-muted)' }}>R$</span>
-                                                <input
-                                                    type="text"
-                                                    value={balanceAmount}
-                                                    onChange={(e) => {
-                                                        const numeric = e.target.value.replace(/\D/g, '')
-                                                        setBalanceAmount((Number(numeric) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-                                                    }}
-                                                    placeholder="0,00"
-                                                    className="w-full font-medium rounded-xl outline-none transition-all focus:border-cyan-500"
-                                                    style={{ padding: '14px 14px 14px 44px', background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
-                                                    disabled={isAdjustingBalance}
-                                                />
+                                    <div className="flex flex-col gap-4">
+                                        <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Carteira & Saldo do Cliente</p>
+                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="flex flex-col">
+                                                <p className="text-[12px] font-medium text-white/50 mb-1">Saldo Atual Disponível</p>
+                                                <p className="text-[42px] font-bold tracking-tighter" style={{ color: 'var(--text-main)', textShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                                                    <span className="text-2xl text-white/40 mr-2 font-medium">R$</span>
+                                                    {(Number(viewingContact.balance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </p>
                                             </div>
-                                            <button 
-                                                onClick={() => handleAdjustBalance('TOPUP')}
-                                                disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
-                                                className="px-6 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                                                style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
-                                            >
-                                                Adicionar Saldo
-                                            </button>
-                                            <button 
-                                                onClick={() => handleAdjustBalance('WITHDRAWAL')}
-                                                disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
-                                                className="px-6 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                                            >
-                                                Remover Saldo
-                                            </button>
+                                            <div className="p-5 rounded-2xl flex items-center gap-4" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div className="relative flex-1">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={balanceAmount}
+                                                        onChange={(e) => {
+                                                            const numeric = e.target.value.replace(/\D/g, '')
+                                                            setBalanceAmount((Number(numeric) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                                                        }}
+                                                        placeholder="0,00"
+                                                        className="w-full text-lg font-bold rounded-xl outline-none transition-all focus:border-white/20 focus:bg-white/5"
+                                                        style={{ padding: '16px 16px 16px 48px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: 'white' }}
+                                                        disabled={isAdjustingBalance}
+                                                    />
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleAdjustBalance('TOPUP')}
+                                                    disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
+                                                    className="px-6 py-4 rounded-xl text-[15px] font-bold transition-all disabled:opacity-50 hover:bg-green-500/10"
+                                                    style={{ background: 'rgba(16, 185, 129, 0.05)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)' }}
+                                                >
+                                                    Adicionar
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleAdjustBalance('WITHDRAWAL')}
+                                                    disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
+                                                    className="px-6 py-4 rounded-xl text-[15px] font-bold transition-all disabled:opacity-50 hover:bg-red-500/10"
+                                                    style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)' }}
+                                                >
+                                                    Remover
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1249,19 +1269,16 @@ const AdminDashboard: React.FC = () => {
                                         const clientProjects = rawProjects.filter(p => p.client_id === viewingContact.id)
                                         const finishedCount = clientProjects.filter(p => ['Concluído', 'completed'].includes(p.status)).length
                                         return (
-                                            <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                <div className="flex items-center gap-2">
-                                                    <Briefcase size={16} style={{ color: 'var(--primary)' }} />
-                                                    <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Métricas de Projetos</span>
-                                                </div>
+                                            <div className="flex flex-col gap-4">
+                                                <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Métricas de Projetos</p>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div className="p-4 rounded-xl flex flex-col justify-center items-center text-center" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Projetos Criados</p>
-                                                        <p className="text-3xl font-bold" style={{ color: 'var(--text-main)' }}>{clientProjects.length}</p>
+                                                    <div className="p-6 rounded-3xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                                        <p className="text-[11px] font-medium text-white/50 mb-2">Projetos Criados</p>
+                                                        <p className="text-4xl font-bold tracking-tight text-white/90">{clientProjects.length}</p>
                                                     </div>
-                                                    <div className="p-4 rounded-xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#10b981' }}>Finalizados</p>
-                                                        <p className="text-3xl font-bold text-green-500">{finishedCount}</p>
+                                                    <div className="p-6 rounded-3xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(16, 185, 129, 0.05)' }}>
+                                                        <p className="text-[11px] font-medium text-green-500/70 mb-2">Finalizados</p>
+                                                        <p className="text-4xl font-bold tracking-tight text-green-400">{finishedCount}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1270,22 +1287,19 @@ const AdminDashboard: React.FC = () => {
 
                                     {/* Lead Data if exists */}
                                     {viewingContact.is_lead && (
-                                        <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <div className="flex items-center gap-2">
-                                                <Search size={16} style={{ color: 'var(--primary)' }} />
-                                                <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dados Comerciais (CRM)</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                        <div className="flex flex-col gap-4">
+                                            <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Dados Comerciais (CRM)</p>
+                                            <div className="p-6 rounded-3xl grid grid-cols-2 gap-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 {viewingContact.source && (
                                                     <div>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Origem da Captação</p>
-                                                        <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.source}</p>
+                                                        <p className="text-[11px] font-medium text-white/50 mb-1">Origem da Captação</p>
+                                                        <p className="text-[15px] font-bold text-white/90">{viewingContact.source}</p>
                                                     </div>
                                                 )}
                                                 {viewingContact.status && (
                                                     <div>
-                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Status no Funil</p>
-                                                        <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.status}</p>
+                                                        <p className="text-[11px] font-medium text-white/50 mb-1">Status no Funil</p>
+                                                        <p className="text-[15px] font-bold text-white/90">{viewingContact.status}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -1298,10 +1312,10 @@ const AdminDashboard: React.FC = () => {
                                             href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="flex items-center justify-center gap-2 py-4 rounded-xl text-sm font-bold text-white w-full transition-all hover:opacity-80"
-                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
+                                            className="flex items-center justify-center gap-3 py-5 rounded-2xl text-[16px] font-bold text-white w-full transition-all hover:opacity-90 hover:scale-[1.01] mt-4"
+                                            style={{ background: '#25D366', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 24px rgba(37, 211, 102, 0.3)' }}
                                         >
-                                            <MessageSquare size={18} /> Iniciar Conversa no WhatsApp
+                                            <MessageSquare size={22} /> Iniciar Conversa no WhatsApp
                                         </a>
                                     )}
                                 </>
