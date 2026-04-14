@@ -116,7 +116,7 @@ const AdminDashboard: React.FC = () => {
                 supabase.from('wallet_transactions').select('*, profiles:user_id(*)').eq('type', 'withdrawal').eq('status', 'PENDING'),
                 supabase.from('profiles').select('*').eq('role', 'editor').eq('onboarding_status', 'pending'),
                 supabase.from('system_configs').select('*'),
-                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('profiles').select('*').order('updated_at', { ascending: false }),
                 supabase.from('leads').select('*').order('created_at', { ascending: false }),
                 supabase.from('projects').select('status, is_pool, created_at'),
                 supabase.from('wallet_transactions').select('amount, created_at, user_id').in('type', ['deposit', 'TOPUP', 'PAYMENT']).eq('status', 'SUCCESS')
