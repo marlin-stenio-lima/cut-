@@ -79,6 +79,23 @@ const EditorThanksPage: React.FC = () => {
                             <LogOut size={18} /> Sair da conta
                         </button>
                     </div>
+                    
+                    {/* DEV TOOLS TEMP */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '32px' }}>
+                        <p style={{ fontSize: '11px', color: '#666', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>[Ferramentas de Desenvolvedor - Use caso tenha testado o formulário logado e perdido seu acesso]</p>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button onClick={async () => {
+                                await import('../../services/supabase').then(s => s.supabase.from('profiles').update({ role: 'admin', onboarding_status: 'approved' }).eq('id', profile.id));
+                                window.location.href = '/dashboard/admin';
+                            }} style={{ fontSize: '12px', padding: '8px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '8px', cursor: 'pointer' }}>Restaurar para Admin</button>
+                            
+                            <button onClick={async () => {
+                                await import('../../services/supabase').then(s => s.supabase.from('profiles').update({ role: 'client', onboarding_status: 'approved' }).eq('id', profile.id));
+                                window.location.href = '/dashboard';
+                            }} style={{ fontSize: '12px', padding: '8px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '8px', cursor: 'pointer' }}>Restaurar para Cliente</button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

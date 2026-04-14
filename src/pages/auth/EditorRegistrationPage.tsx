@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import Logo from '../../components/common/Logo';
 import { supabase } from '../../services/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const EditorRegistrationPage: React.FC = () => {
+    const { session, signOut } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -99,6 +101,24 @@ const EditorRegistrationPage: React.FC = () => {
             portfolioFiles: prev.portfolioFiles.filter((_, i) => i !== index)
         }));
     };
+
+    if (session) {
+        return (
+            <div className="futuristic-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                <div style={{ maxWidth: '440px', width: '100%', textAlign: 'center', background: 'rgba(5,5,5,0.8)', backdropFilter: 'blur(16px)', padding: '40px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}>
+                    <div className="flex justify-center mb-6"><Logo /></div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '12px' }}>Você já está conectado!</h2>
+                    <p style={{ color: '#a0a0a0', fontSize: '0.95rem', lineHeight: 1.5, marginBottom: '32px' }}>
+                        Para se registrar como um novo Editor na Easy Content, você precisa antes <strong>sair da sua conta atual</strong> (Admin/Cliente).
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <button onClick={() => navigate('/dashboard')} style={{ padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 600, cursor: 'pointer' }} className="hover:bg-white/10 transition-colors">Voltar para o Dashboard</button>
+                        <button onClick={() => signOut()} style={{ padding: '14px', borderRadius: '12px', background: '#ef4444', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }} className="hover:bg-red-600 transition-colors">Sair da Conta</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const nextStep = async () => {
         setError(null);

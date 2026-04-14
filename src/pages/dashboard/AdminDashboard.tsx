@@ -27,7 +27,7 @@ const AdminDashboard: React.FC = () => {
     const [viewingContact, setViewingContact] = useState<any | null>(null)
     const [showEditorRejectModal, setShowEditorRejectModal] = useState<string | null>(null)
     const [editorRejectionReason, setEditorRejectionReason] = useState('')
-    const [editorUrls, setEditorUrls] = useState<{ identity: string, face: string }>({ identity: '', face: '' })
+    const [editorUrls, setEditorUrls] = useState<{ identity: string, face: string, portfolioVideos: string[] }>({ identity: '', face: '', portfolioVideos: [] })
     const [leads, setLeads] = useState<any[]>([])
     const [leadSearch, setLeadSearch] = useState('')
     const [editorSearch, setEditorSearch] = useState('')
@@ -44,6 +44,8 @@ const AdminDashboard: React.FC = () => {
     const [dashboardDateFilter, setDashboardDateFilter] = useState('30d')
     const [balanceAmount, setBalanceAmount] = useState('')
     const [isAdjustingBalance, setIsAdjustingBalance] = useState(false)
+    const [isApprovingEditor, setIsApprovingEditor] = useState(false)
+    const [isApproveSuccess, setIsApproveSuccess] = useState(false)
     useEffect(() => { loadAdminData() }, [])
     useEffect(() => {
         if (!rawTxs || !rawProjects) return;
@@ -92,19 +94,26 @@ const AdminDashboard: React.FC = () => {
     }, [location.pathname])
     useEffect(() => {
         if (viewingContact) fetchSignedUrls(viewingContact)
-        else setEditorUrls({ identity: '', face: '' })
+        else setEditorUrls({ identity: '', face: '', portfolioVideos: [] })
     }, [viewingContact])
 
     const fetchSignedUrls = async (editor: any) => {
         try {
-            const urls = { identity: '', face: '' }
+            const urls = { identity: '', face: '', portfolioVideos: [] as string[] }
             if (editor.identity_doc_url) {
-                const { data } = await supabase.storage.from('editor-docs').createSignedUrl(editor.identity_doc_url, 3600)
+                const { data } = await supabase.storage.from('editor-identity').createSignedUrl(editor.identity_doc_url, 3600)
                 if (data) urls.identity = data.signedUrl
             }
             if (editor.face_photo_url) {
-                const { data } = await supabase.storage.from('editor-docs').createSignedUrl(editor.face_photo_url, 3600)
+                const { data } = await supabase.storage.from('editor-face').createSignedUrl(editor.face_photo_url, 3600)
                 if (data) urls.face = data.signedUrl
+            }
+            if (editor.portfolio_links && Array.isArray(editor.portfolio_links)) {
+                for (const link of editor.portfolio_links) {
+                    if (link.startsWith('http')) continue;
+                    const { data } = await supabase.storage.from('editor-portfolio').createSignedUrl(link, 3600)
+                    if (data?.signedUrl) urls.portfolioVideos.push(data.signedUrl)
+                }
             }
             setEditorUrls(urls)
         } catch (err) { console.error(err) }
@@ -203,12 +212,33 @@ const AdminDashboard: React.FC = () => {
         try { await asaasService.rejectWithdrawal(showRejectModal, rejectionReason); setShowRejectModal(null); setRejectionReason(''); loadAdminData() } catch { alert('Erro') }
     }
     const handleApproveEditor = async (id: string) => {
-        try { await supabase.from('profiles').update({ onboarding_status: 'approved' }).eq('id', id); loadAdminData() } catch { alert('Erro') }
+        setIsApprovingEditor(true);
+        try { 
+            const { error } = await supabase.from('profiles').update({ onboarding_status: 'approved' }).eq('id', id); 
+            if (error) throw error;
+            
+            // Optimistic UI update so the modal and lists switch to "Ativo" instantly
+            setAllEditors((prev: any[]) => prev.map((e: any) => e.id === id ? { ...e, onboarding_status: 'approved' } : e));
+            setPendingEditors((prev: any[]) => prev.filter((e: any) => e.id !== id));
+            setViewingContact((prev: any) => prev ? { ...prev, onboarding_status: 'approved' } : null);
+            
+            setIsApproveSuccess(true);
+            setTimeout(() => {
+                setViewingContact(null);
+                setIsApprovingEditor(false);
+                setIsApproveSuccess(false);
+                loadAdminData(); // Full refresh background task after animation
+            }, 1800);
+        } catch { 
+            alert('Erro ao aprovar') 
+            setIsApprovingEditor(false);
+        }
     }
     const handleRejectEditor = async () => {
         if (!showEditorRejectModal || !editorRejectionReason) return
         try {
-            await supabase.from('profiles').update({ onboarding_status: 'rejected', rejection_reason: editorRejectionReason }).eq('id', showEditorRejectModal)
+            const { error } = await supabase.from('profiles').update({ onboarding_status: 'rejected', rejection_reason: editorRejectionReason }).eq('id', showEditorRejectModal)
+            if (error) throw error;
             setShowEditorRejectModal(null); setEditorRejectionReason(''); loadAdminData()
         } catch { alert('Erro') }
     }
@@ -690,7 +720,7 @@ const AdminDashboard: React.FC = () => {
                                 <tbody>
                                     {allEditors.filter(e => {
                                         if (editorFilter === 'pending' && e.onboarding_status !== 'pending') return false;
-                                        if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !e.email?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
+                                        if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !(e.email || e.contact_email)?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
                                         return true;
                                     }).length === 0 ? (
                                         <tr>
@@ -702,7 +732,7 @@ const AdminDashboard: React.FC = () => {
                                     ) : (
                                         allEditors.filter(e => {
                                             if (editorFilter === 'pending' && e.onboarding_status !== 'pending') return false;
-                                            if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !e.email?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
+                                            if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !(e.email || e.contact_email)?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
                                             return true;
                                         }).map(e => (
                                             <tr key={e.id} className="transition-all hover:bg-[rgba(255,255,255,0.02)] cursor-pointer" style={{ borderBottom: '1px solid var(--glass-border)' }} onClick={() => setViewingContact(e)}>
@@ -729,21 +759,16 @@ const AdminDashboard: React.FC = () => {
                                                 </td>
                                                 <td style={{ padding: '16px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
-                                                        <Mail size={13} /> <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.email || '—'}</span>
+                                                        <Mail size={13} /> <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.email || e.contact_email || '—'}</span>
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '16px', fontSize: '14px', color: 'var(--text-muted)' }}>
                                                     {e.created_at ? new Date(e.created_at).toLocaleDateString('pt-BR') : '—'}
                                                 </td>
                                                 <td style={{ padding: '16px' }}>
-                                                    <span style={{
-                                                        display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
-                                                        background: e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(234,179,8,0.15)',
-                                                        color: e.onboarding_status === 'approved' ? '#10b981' : '#eab308',
-                                                        border: `1px solid ${e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.2)' : 'rgba(234,179,8,0.4)'}`
-                                                    }}>
-                                                        {e.onboarding_status === 'approved' ? 'Editor Ativo' : 'Pendente'}
-                                                    </span>
+                                                    {e.onboarding_status === 'approved' && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>Ativo</span>}
+                                                    {e.onboarding_status === 'pending' && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }}>Pendente</span>}
+                                                    {e.onboarding_status === 'rejected' && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>Recusado</span>}
                                                 </td>
                                                 <td style={{ padding: '16px', textAlign: 'right' }} onClick={(ev) => ev.stopPropagation()}>
                                                     <button className="transition-all hover:bg-[rgba(255,255,255,0.05)]" style={{ padding: '8px', borderRadius: '8px', color: 'var(--text-muted)', border: 'none', background: 'transparent' }}>
@@ -979,8 +1004,9 @@ const AdminDashboard: React.FC = () => {
 
             {/* ─── Modal: Viewing Contact ─── */}
             {viewingContact && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}>
-                    <div className="w-full max-w-2xl rounded-[32px] overflow-hidden max-h-[90vh] flex flex-col shadow-2xl transition-all" style={{ background: '#09090b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 80px rgba(0,0,0,0.8)' }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(24px)', animation: 'fadeIn 0.3s ease-out' }}>
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(16,185,129,0.08) 0%, transparent 60%)' }}></div>
+                    <div className="w-full max-w-2xl rounded-[32px] overflow-hidden max-h-[90vh] flex flex-col shadow-2xl transition-all relative" style={{ background: 'rgba(10, 10, 15, 0.95)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.05)' }}>
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-8 py-6 flex-shrink-0 relative overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)' }}>
                             <div className="flex items-center gap-5 relative z-10">
@@ -1006,21 +1032,21 @@ const AdminDashboard: React.FC = () => {
                         </div>
 
                         {/* Modal Body */}
-                        <div className="overflow-y-auto flex-1 p-8 flex flex-col gap-8 custom-scrollbar">
+                        <div className="overflow-y-auto flex-1 flex flex-col gap-8 custom-scrollbar" style={{ padding: '32px' }}>
                             {/* Contact Info */}
                             <div className="flex flex-col gap-4">
                                 <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Contato</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                    <div className="flex items-center gap-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)', padding: '16px' }}>
                                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                             <Mail size={18} style={{ color: 'var(--primary)' }} />
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Email</p>
-                                            <p className="text-[15px] font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || '—'}</p>
+                                            <p className="text-[15px] font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || viewingContact.contact_email || '—'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                    <div className="flex items-center gap-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)', padding: '16px' }}>
                                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                             <Phone size={18} style={{ color: 'var(--primary)' }} />
                                         </div>
@@ -1030,7 +1056,7 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                     </div>
                                     {viewingContact.location && (
-                                        <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                        <div className="flex items-center gap-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)', padding: '16px' }}>
                                             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                                 <MapPin size={18} style={{ color: 'var(--primary)' }} />
                                             </div>
@@ -1040,7 +1066,7 @@ const AdminDashboard: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-4 p-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                    <div className="flex items-center gap-4 rounded-2xl transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.03)', padding: '16px' }}>
                                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                             <Calendar size={18} style={{ color: 'var(--primary)' }} />
                                         </div>
@@ -1060,14 +1086,14 @@ const AdminDashboard: React.FC = () => {
                                     {/* Skills & Experience */}
                                     <div className="flex flex-col gap-4">
                                         <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Habilidades e Experiência</p>
-                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div className="rounded-3xl flex flex-col gap-6" style={{ padding: '24px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                             {viewingContact.software_skills?.length > 0 && (
                                                 <div>
                                                     <p className="text-[11px] font-medium text-white/50 mb-3">Softwares Dominados</p>
                                                     <div className="flex flex-wrap gap-2.5">
                                                         {viewingContact.software_skills.map((s: string) => (
-                                                            <span key={s} className="px-3.5 py-1.5 rounded-xl text-[13px] font-semibold"
-                                                                style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                            <span key={s} className="rounded-xl text-[13px] font-semibold"
+                                                                style={{ padding: '6px 14px', background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
                                                                 {s}
                                                             </span>
                                                         ))}
@@ -1087,14 +1113,14 @@ const AdminDashboard: React.FC = () => {
                                     <div className="flex flex-col gap-4">
                                         <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Disponibilidade & Valores</p>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="rounded-3xl" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                                     <Clock size={18} style={{ color: 'var(--primary)' }} />
                                                 </div>
                                                 <p className="text-[11px] font-medium text-white/50 mb-1">Horas dedicadas/semana</p>
                                                 <p className="text-[16px] font-semibold text-white/90">{viewingContact.weekly_availability || '—'}</p>
                                             </div>
-                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="rounded-3xl" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                                                     <DollarSign size={18} style={{ color: 'var(--primary)' }} />
                                                 </div>
@@ -1106,19 +1132,39 @@ const AdminDashboard: React.FC = () => {
 
                                     {/* Portfolio and Motivation */}
                                     <div className="flex flex-col gap-4">
-                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                            {viewingContact.portfolio_url && (
-                                                <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
-                                                    className="flex items-center justify-between px-6 py-5 rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.01]"
-                                                    style={{ background: 'var(--primary)', color: 'white', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>
-                                                    <span>Acessar Portfólio do Contato</span>
+                                        <div className="rounded-3xl flex flex-col gap-6" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            {viewingContact.portfolio_links && viewingContact.portfolio_links.filter((l: string) => l.startsWith('http')).map((link: string, i: number) => (
+                                                <a key={i} href={link} target="_blank" rel="noreferrer"
+                                                    className="flex items-center justify-between rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.01]"
+                                                    style={{ padding: '16px 20px', background: 'var(--primary)', color: 'white', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>
+                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>Portfólio Externo</span>
                                                     <ExternalLink size={18} />
                                                 </a>
+                                            ))}
+                                            {viewingContact.portfolio_url && (!viewingContact.portfolio_links || viewingContact.portfolio_links.length === 0) && (
+                                                <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
+                                                    className="flex items-center justify-between rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.01]"
+                                                    style={{ padding: '16px 20px', background: 'var(--primary)', color: 'white', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 16px rgba(99,102,241,0.25)' }}>
+                                                    <span>Acessar Portfólio Externo</span>
+                                                    <ExternalLink size={18} />
+                                                </a>
+                                            )}
+                                            {editorUrls.portfolioVideos && editorUrls.portfolioVideos.length > 0 && (
+                                                <div className="flex flex-col gap-3">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-white/50">Vídeos Enviados ({editorUrls.portfolioVideos.length})</p>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {editorUrls.portfolioVideos.map((vid, idx) => (
+                                                            <div key={idx} className="rounded-2xl overflow-hidden relative group bg-black/40 border border-white/10" style={{ height: '160px' }}>
+                                                                <video src={vid} controls className="w-full h-full object-contain" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             )}
                                             {viewingContact.motivation && (
                                                 <div>
                                                     <p className="text-[11px] font-medium text-white/50 mb-2">Motivação Pessoal</p>
-                                                    <div className="p-5 rounded-2xl" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)' }}>
+                                                    <div className="rounded-2xl" style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)' }}>
                                                         <p className="text-[14px] text-white/80 leading-relaxed italic">"{viewingContact.motivation}"</p>
                                                     </div>
                                                 </div>
@@ -1129,7 +1175,7 @@ const AdminDashboard: React.FC = () => {
                                     {/* Bank Information (PIX) */}
                                     <div className="flex flex-col gap-4">
                                         <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Financeiro</p>
-                                        <div className="p-6 rounded-3xl flex items-center gap-5" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                                        <div className="rounded-3xl flex items-center gap-5" style={{ padding: '24px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
                                             <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16, 185, 129, 0.15)', boxShadow: '0 8px 24px rgba(16, 185, 129, 0.2)' }}>
                                                 <DollarSign size={26} style={{ color: '#10b981' }} />
                                             </div>
@@ -1143,10 +1189,10 @@ const AdminDashboard: React.FC = () => {
                                     </div>
 
                                     {/* Documents */}
-                                    {(editorUrls.identity || editorUrls.face) && (
+                                    {viewingContact.role === 'editor' && (
                                         <div className="flex flex-col gap-4">
                                             <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Documentação & Segurança</p>
-                                            <div className="p-6 rounded-3xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="rounded-3xl" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="grid grid-cols-2 gap-6">
                                                     {editorUrls.identity ? (
                                                         <div className="flex flex-col gap-3">
@@ -1179,38 +1225,7 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* WhatsApp Quick Action */}
-                                    {viewingContact.whatsapp && (
-                                        <a
-                                            href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex items-center justify-center gap-3 py-5 rounded-2xl text-[16px] font-bold text-white w-full transition-all hover:opacity-90 hover:scale-[1.01]"
-                                            style={{ background: '#25D366', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 24px rgba(37, 211, 102, 0.3)' }}
-                                        >
-                                            <MessageSquare size={22} /> Iniciar Conversa no WhatsApp
-                                        </a>
-                                    )}
 
-                                    {/* Approval Actions */}
-                                    {viewingContact.onboarding_status === 'pending' && (
-                                        <div className="flex gap-4 pt-4">
-                                            <button
-                                                onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
-                                                className="flex-1 py-5 rounded-2xl text-[15px] font-bold transition-all hover:bg-red-500/10"
-                                                style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                                            >
-                                                RECUSAR PERFIL
-                                            </button>
-                                            <button
-                                                onClick={() => { handleApproveEditor(viewingContact.id); setViewingContact(null); }}
-                                                className="flex-1 py-5 rounded-2xl text-[15px] font-bold text-white transition-all hover:scale-[1.02]"
-                                                style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 12px 24px rgba(16, 185, 129, 0.3)' }}
-                                            >
-                                                APROVAR EDITOR
-                                            </button>
-                                        </div>
-                                    )}
                                 </>
                             )}
 
@@ -1220,7 +1235,7 @@ const AdminDashboard: React.FC = () => {
                                     {/* Wallet Management */}
                                     <div className="flex flex-col gap-4">
                                         <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Carteira & Saldo do Cliente</p>
-                                        <div className="p-6 rounded-3xl flex flex-col gap-6" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div className="rounded-3xl flex flex-col gap-6" style={{ padding: '24px', background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                             <div className="flex flex-col">
                                                 <p className="text-[12px] font-medium text-white/50 mb-1">Saldo Atual Disponível</p>
                                                 <p className="text-[42px] font-bold tracking-tighter" style={{ color: 'var(--text-main)', textShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
@@ -1228,7 +1243,7 @@ const AdminDashboard: React.FC = () => {
                                                     {(Number(viewingContact.balance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                 </p>
                                             </div>
-                                            <div className="p-5 rounded-2xl flex items-center gap-4" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="rounded-2xl flex items-center gap-4" style={{ padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <div className="relative flex-1">
                                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
                                                     <input
@@ -1272,11 +1287,11 @@ const AdminDashboard: React.FC = () => {
                                             <div className="flex flex-col gap-4">
                                                 <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Métricas de Projetos</p>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div className="p-6 rounded-3xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                                    <div className="rounded-3xl flex flex-col justify-center items-center text-center" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)' }}>
                                                         <p className="text-[11px] font-medium text-white/50 mb-2">Projetos Criados</p>
                                                         <p className="text-4xl font-bold tracking-tight text-white/90">{clientProjects.length}</p>
                                                     </div>
-                                                    <div className="p-6 rounded-3xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(16, 185, 129, 0.05)' }}>
+                                                    <div className="rounded-3xl flex flex-col justify-center items-center text-center" style={{ padding: '24px', background: 'rgba(16, 185, 129, 0.05)' }}>
                                                         <p className="text-[11px] font-medium text-green-500/70 mb-2">Finalizados</p>
                                                         <p className="text-4xl font-bold tracking-tight text-green-400">{finishedCount}</p>
                                                     </div>
@@ -1289,7 +1304,7 @@ const AdminDashboard: React.FC = () => {
                                     {viewingContact.is_lead && (
                                         <div className="flex flex-col gap-4">
                                             <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'rgba(255,255,255,0.4)' }}>Dados Comerciais (CRM)</p>
-                                            <div className="p-6 rounded-3xl grid grid-cols-2 gap-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="rounded-3xl grid grid-cols-2 gap-6" style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 {viewingContact.source && (
                                                     <div>
                                                         <p className="text-[11px] font-medium text-white/50 mb-1">Origem da Captação</p>
@@ -1306,19 +1321,50 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* WhatsApp */}
-                                    {viewingContact.whatsapp && (
-                                        <a
-                                            href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex items-center justify-center gap-3 py-5 rounded-2xl text-[16px] font-bold text-white w-full transition-all hover:opacity-90 hover:scale-[1.01] mt-4"
-                                            style={{ background: '#25D366', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 24px rgba(37, 211, 102, 0.3)' }}
-                                        >
-                                            <MessageSquare size={22} /> Iniciar Conversa no WhatsApp
-                                        </a>
-                                    )}
                                 </>
+                            )}
+                        </div>
+                        
+                        {/* ─── Sticky Action Footer ─── */}
+                        <div className="flex-shrink-0 flex flex-col gap-4 px-8 py-6 relative z-20" style={{ background: 'rgba(7, 7, 10, 0.95)', backdropFilter: 'blur(24px)', borderTop: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 -20px 40px rgba(0,0,0,0.6)' }}>
+                            {viewingContact.whatsapp && (
+                                <a
+                                    href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-3 py-4 rounded-[20px] text-[14px] font-bold text-white w-full transition-all hover:scale-[1.01]"
+                                    style={{ background: 'linear-gradient(135deg, #128C7E 0%, #075E54 100%)', textDecoration: 'none', display: 'flex', boxShadow: '0 8px 32px rgba(18, 140, 126, 0.25)' }}
+                                >
+                                    <MessageSquare size={18} /> INICIAR CONVERSA NO WHATSAPP
+                                </a>
+                            )}
+                            
+                            {viewingContact.role === 'editor' && viewingContact.onboarding_status === 'pending' && (
+                                <div className="flex gap-4">
+                                    <button
+                                        disabled={isApprovingEditor}
+                                        onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
+                                        className="flex-1 flex justify-center items-center gap-2 py-4 rounded-[20px] text-[14px] font-bold transition-all hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
+                                        style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                                    >
+                                        <X size={18} /> Recusar Perfil
+                                    </button>
+                                    <button
+                                        disabled={isApprovingEditor || isApproveSuccess}
+                                        onClick={() => handleApproveEditor(viewingContact.id)}
+                                        className={`flex-[1.5] flex justify-center items-center gap-3 py-4 rounded-[20px] text-[14px] font-bold text-white transition-all ${isApproveSuccess ? 'scale-[1.02]' : 'hover:scale-[1.02]'} disabled:cursor-wait relative overflow-hidden group uppercase tracking-wider`}
+                                        style={{ 
+                                            background: isApproveSuccess ? '#22c55e' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                                            boxShadow: isApproveSuccess ? '0 12px 32px rgba(34, 197, 94, 0.6)' : '0 12px 32px rgba(16, 185, 129, 0.4)' 
+                                        }}
+                                    >
+                                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                                        <div className="relative z-10 flex items-center gap-3">
+                                            {isApproveSuccess ? <CheckCircle size={22} className="animate-bounce" /> : isApprovingEditor ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                                            {isApproveSuccess ? 'PERFIL APROVADO!' : isApprovingEditor ? 'APROVANDO...' : 'APROVAR EDITOR'}
+                                        </div>
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
