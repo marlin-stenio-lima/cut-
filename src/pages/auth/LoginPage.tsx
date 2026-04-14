@@ -2,7 +2,7 @@ import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react'
 import Logo from '../../components/common/Logo'
 import { supabase } from '../../services/supabase'
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('')

@@ -48,36 +48,6 @@ export interface UIConversation {
   assignedUserId: string | null;
 }
 
-// Mock initial data
-const MOCK_CONVERSATIONS: UIConversation[] = [
-  {
-    id: 'conv-1', contactId: 'c1', contactName: 'Cliente VIP', contactPhone: '+55 11 99999-9999', 
-    contactAvatar: 'https://ui-avatars.com/api/?name=Cliente+VIP&background=0ea5e9&color=fff',
-    contactEmail: 'cliente@vip.com', status: 'human', lastMessage: 'Preciso de um orçamento rápido.',
-    lastMessageTime: '10:45', unreadCount: 2, tags: ['Urgente', 'VIP'],
-    messages: [
-      { id: 'm1', content: 'Olá, gostaria de saber os valores para um projeto em 3D.', timestamp: '10:42', direction: MessageDirection.INCOMING, type: MessageType.TEXT, status: 'read', fromType: 'user', mediaUrl: null },
-      { id: 'm2', content: 'Olá! Claro, me conta mais sobre o projeto, é arquitetônico?', timestamp: '10:43', direction: MessageDirection.OUTGOING, type: MessageType.TEXT, status: 'read', fromType: 'human', mediaUrl: null },
-      { id: 'm3', content: 'Sim, um prédio residencial de 10 andares.', timestamp: '10:44', direction: MessageDirection.INCOMING, type: MessageType.TEXT, status: 'read', fromType: 'user', mediaUrl: null },
-      { id: 'm4', content: 'Preciso de um orçamento rápido.', timestamp: '10:45', direction: MessageDirection.INCOMING, type: MessageType.TEXT, status: 'read', fromType: 'user', mediaUrl: null }
-    ],
-    clientMemory: { lead_profile: { lead_stage: 'qualified', interests: ['Render 3D', 'Arquitetura'] }, sales_intelligence: { pain_points: ['Prazo'], next_best_action: 'Enviar proposta' }, interaction_summary: { total_conversations: 4 } },
-    notes: 'Cliente de alto valor, foco no prazo de entrega.', assignedUserId: 'user-1'
-  },
-  {
-    id: 'conv-2', contactId: 'c2', contactName: 'Editor Master', contactPhone: '+55 21 88888-8888', 
-    contactAvatar: 'https://ui-avatars.com/api/?name=Editor+Master&background=f59e0b&color=fff',
-    contactEmail: null, status: 'human', lastMessage: '📷 Imagem',
-    lastMessageTime: 'Ontem', unreadCount: 0, tags: ['Editor'],
-    messages: [
-      { id: 'm10', content: 'Estou enviando o rascunho do último projeto.', timestamp: '16:00', direction: MessageDirection.INCOMING, type: MessageType.TEXT, status: 'read', fromType: 'user', mediaUrl: null },
-      { id: 'm11', content: 'Aqui está.', timestamp: '16:01', direction: MessageDirection.INCOMING, type: MessageType.IMAGE, status: 'read', fromType: 'user', mediaUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&h=300&fit=crop' }
-    ],
-    clientMemory: { lead_profile: { lead_stage: 'active_editor', interests: [] }, sales_intelligence: { pain_points: [], next_best_action: 'Revisar arte' }, interaction_summary: { total_conversations: 20 } },
-    notes: null, assignedUserId: null
-  }
-];
-
 const AdminWhatsApp: React.FC = () => {
   const { showAlert } = useModal();
 
@@ -86,7 +56,6 @@ const AdminWhatsApp: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
   const [evoUrl, setEvoUrl] = useState('');
   const [evoKey, setEvoKey] = useState('');
   const [evoInstance, setEvoInstance] = useState('');
@@ -162,14 +131,6 @@ const AdminWhatsApp: React.FC = () => {
     } catch (err) {
       console.error('Erro ao buscar mensagens do Supabase:', err);
     }
-  };
-
-  const saveSettings = () => {
-    localStorage.setItem('evoUrl', evoUrl);
-    localStorage.setItem('evoKey', evoKey);
-    localStorage.setItem('evoInstance', evoInstance);
-    setShowSettings(false);
-    showAlert('Sucesso', 'Configurações da Evolution API salvas.', 'success');
   };
 
   const activeChat = conversations.find(c => c.id === selectedChatId);

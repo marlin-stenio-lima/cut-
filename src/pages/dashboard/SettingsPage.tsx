@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Link, QrCode, LogOut, CheckCircle, Smartphone, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Settings, QrCode, LogOut, CheckCircle, Smartphone, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { useModal } from '../../context/ModalContext';
 
 const SettingsPage: React.FC = () => {
