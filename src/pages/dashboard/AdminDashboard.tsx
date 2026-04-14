@@ -41,8 +41,44 @@ const AdminDashboard: React.FC = () => {
     const [rawTxs, setRawTxs] = useState<any[]>([])
     const [rawProjects, setRawProjects] = useState<any[]>([])
     const [dashboardDateFilter, setDashboardDateFilter] = useState('30d')
-
     useEffect(() => { loadAdminData() }, [])
+    useEffect(() => {
+        if (!rawTxs || !rawProjects) return;
+
+        let filteredTxs = rawTxs;
+        let filteredProjects = rawProjects;
+        const now = new Date()
+
+        if (dashboardDateFilter !== 'all') {
+            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'year': 365 }
+            const diff = daysMap[dashboardDateFilter]
+            if (diff) {
+                const limitDate = new Date(now)
+                limitDate.setDate(limitDate.getDate() - diff)
+                filteredTxs = rawTxs.filter(tx => tx.created_at && new Date(tx.created_at) >= limitDate)
+                filteredProjects = rawProjects.filter(p => p.created_at && new Date(p.created_at) >= limitDate)
+            }
+        }
+
+        const rev = filteredTxs.reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
+        let cCount = 0; let oCount = 0;
+        const sCounts: Record<string, number> = {}
+        filteredProjects.forEach(p => {
+            if (p.status === 'Concluído') cCount++;
+            else if (p.status !== 'Cancelado') oCount++;
+            sCounts[p.status] = (sCounts[p.status] || 0) + 1
+        })
+
+        setOverviewStats({
+            totalRevenue: rev,
+            commissionTotal: rev * (commissionPercentage / 100),
+            completedProjects: cCount,
+            ongoingProjects: oCount,
+            statusCounts: sCounts,
+            totalProjects: filteredProjects.length
+        })
+    }, [dashboardDateFilter, rawTxs, rawProjects, commissionPercentage, allClients.length, stats.activeEditors])
+
     useEffect(() => {
         if (location.pathname.includes('/leads')) setActiveTab('leads')
         else if (location.pathname.includes('/crm')) setActiveTab('crm')
@@ -80,7 +116,7 @@ const AdminDashboard: React.FC = () => {
                 supabase.from('wallet_transactions').select('*, profiles:user_id(*)').eq('type', 'withdrawal').eq('status', 'PENDING'),
                 supabase.from('profiles').select('*').eq('role', 'editor').eq('onboarding_status', 'pending'),
                 supabase.from('system_configs').select('*'),
-                supabase.from('profiles').select('*, email:contact_email').order('created_at', { ascending: false }),
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
                 supabase.from('leads').select('*').order('created_at', { ascending: false }),
                 supabase.from('projects').select('status, is_pool, created_at'),
                 supabase.from('wallet_transactions').select('amount, created_at, user_id').in('type', ['deposit', 'TOPUP', 'PAYMENT']).eq('status', 'SUCCESS')
@@ -693,7 +729,9 @@ const AdminDashboard: React.FC = () => {
                                         <Trash2 size={14} /> Excluir ({selectedClients.length})
                                     </button>
                                 )}
-                                <button className="rounded-xl text-xs font-medium text-white transition-all hover:opacity-80"
+                                <button 
+                                    onClick={() => setShowLeadModal(true)}
+                                    className="rounded-xl text-xs font-medium text-white transition-all hover:opacity-80"
                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--secondary)' }}>
                                     <Plus size={14} /> Novo Cliente
                                 </button>
