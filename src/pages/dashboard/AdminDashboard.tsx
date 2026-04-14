@@ -1004,38 +1004,38 @@ const AdminDashboard: React.FC = () => {
                         </div>
 
                         {/* Modal Body */}
-                        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+                        <div className="overflow-y-auto flex-1 p-6 flex flex-col gap-6">
                             {/* Contact Info */}
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Contato</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Mail size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                            <div className="flex flex-col gap-2">
+                                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Contato</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Mail size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                         <div className="min-w-0">
-                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Email</p>
+                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Email</p>
                                             <p className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{viewingContact.email || '—'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Phone size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Phone size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                         <div>
-                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>WhatsApp</p>
+                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>WhatsApp</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.whatsapp || '—'}</p>
                                         </div>
                                     </div>
                                     {viewingContact.location && (
-                                        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <MapPin size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                        <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                             <div>
-                                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Localização</p>
+                                                <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Localização</p>
                                                 <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.location}</p>
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <Calendar size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <Calendar size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                         <div>
-                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Membro desde</p>
+                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Membro desde</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>
                                                 {viewingContact.created_at ? new Date(viewingContact.created_at).toLocaleDateString('pt-BR') : '—'}
                                             </p>
@@ -1048,19 +1048,19 @@ const AdminDashboard: React.FC = () => {
                             {viewingContact.role === 'editor' && (
                                 <>
                                     {/* Skills & Experience */}
-                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2 mb-4">
+                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2">
                                             <Star size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Habilidades e Experiência</span>
+                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Habilidades e Experiência</span>
                                         </div>
-                                        <div className="space-y-4">
+                                        <div className="flex flex-col gap-5">
                                             {viewingContact.software_skills?.length > 0 && (
                                                 <div>
-                                                    <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Softwares</p>
+                                                    <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Softwares Dominados</p>
                                                     <div className="flex flex-wrap gap-2">
                                                         {viewingContact.software_skills.map((s: string) => (
-                                                            <span key={s} className="px-2.5 py-1 rounded-lg text-xs"
-                                                                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                            <span key={s} className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                                                                style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
                                                                 {s}
                                                             </span>
                                                         ))}
@@ -1069,49 +1069,49 @@ const AdminDashboard: React.FC = () => {
                                             )}
                                             {viewingContact.editing_experience && (
                                                 <div>
-                                                    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Anos de Experiência</p>
-                                                    <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
+                                                    <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Tempo de Experiência</p>
+                                                    <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* Availability & Price */}
-                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2 mb-4">
+                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2">
                                             <Clock size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Disponibilidade</span>
+                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Disponibilidade & Valores</span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-2 gap-6">
                                             <div>
-                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Horas/semana</p>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability || '—'}</p>
+                                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Horas dedicadas/semana</p>
+                                                <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability || '—'}</p>
                                             </div>
                                             <div>
-                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão</p>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation || '—'}</p>
+                                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão de Ganhos</p>
+                                                <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation || '—'}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Portfolio and Motivation */}
-                                    <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2 mb-2">
+                                    <div className="p-5 rounded-2xl flex flex-col gap-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2">
                                             <Code size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Portfólio & Perfil</span>
+                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Portfólio & Perfil Comportamental</span>
                                         </div>
                                         {viewingContact.portfolio_url && (
                                             <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
-                                                className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80 mt-2"
+                                                className="flex items-center justify-between px-5 py-4 rounded-xl text-sm font-medium transition-all hover:opacity-80"
                                                 style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--primary)', textDecoration: 'none', display: 'flex' }}>
                                                 <span>Acessar Portfólio Externo</span>
-                                                <ExternalLink size={14} />
+                                                <ExternalLink size={15} />
                                             </a>
                                         )}
                                         {viewingContact.motivation && (
-                                            <div className="mt-4">
-                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Motivação</p>
-                                                <p className="text-sm py-2" style={{ color: 'var(--text-main)' }}>
+                                            <div>
+                                                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Motivação Pessoal</p>
+                                                <p className="text-[14px] p-4 rounded-xl leading-relaxed" style={{ color: 'var(--text-main)', background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
                                                     {viewingContact.motivation}
                                                 </p>
                                             </div>
@@ -1119,39 +1119,41 @@ const AdminDashboard: React.FC = () => {
                                     </div>
 
                                     {/* Bank Information (PIX) */}
-                                    <div className="p-4 rounded-xl flex items-center gap-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <DollarSign size={24} style={{ color: '#10b981' }} />
+                                    <div className="p-5 rounded-2xl flex items-center gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
+                                            <DollarSign size={24} style={{ color: '#10b981' }} />
+                                        </div>
                                         <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Chave PIX (Para Saques)</p>
-                                            <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-main)' }}>
-                                                {viewingContact.pix_key ? `${viewingContact.pix_key_type || ''} - ${viewingContact.pix_key}` : 'Visualizando dados pelo Asaas / Não cadastrado no CRM ainda'}
+                                            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Chave PIX (Para Saques)</p>
+                                            <p className="text-[16px] font-bold mt-1" style={{ color: 'var(--text-main)' }}>
+                                                {viewingContact.pix_key ? `${viewingContact.pix_key_type || ''} - ${viewingContact.pix_key}` : 'Informação pendente ou via Asaas centralizado'}
                                             </p>
                                         </div>
                                     </div>
 
                                     {/* Documents */}
                                     {(editorUrls.identity || editorUrls.face) && (
-                                        <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <div className="flex items-center gap-2">
                                                 <Shield size={16} style={{ color: 'var(--primary)' }} />
-                                                <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Documentação</span>
+                                                <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Documentação & Segurança</span>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-2 gap-5">
                                                 {editorUrls.identity ? (
                                                     <div>
-                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Documento Oficial</p>
-                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-32 object-cover rounded-xl border border-white/5" />
+                                                        <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Documento Oficial (Frente/Verso)</p>
+                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-40 object-cover rounded-xl border border-white/10" style={{ background: 'var(--bg-deep)' }} />
                                                     </div>
                                                 ) : (
-                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem doc</div>
+                                                    <div className="h-40 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem documento enviado</div>
                                                 )}
                                                 {editorUrls.face ? (
                                                     <div>
-                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Selfie (Prova de vida)</p>
-                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-32 object-cover rounded-xl border border-white/5" />
+                                                        <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Selfie (Prova de vida)</p>
+                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-40 object-cover rounded-xl border border-white/10" style={{ background: 'var(--bg-deep)' }} />
                                                     </div>
                                                 ) : (
-                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie</div>
+                                                    <div className="h-40 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie enviada</div>
                                                 )}
                                             </div>
                                         </div>
@@ -1159,20 +1161,20 @@ const AdminDashboard: React.FC = () => {
 
                                     {/* Approval Actions placed at the bottom for easy access */}
                                     {viewingContact.onboarding_status === 'pending' && (
-                                        <div className="flex gap-3 pt-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
+                                        <div className="flex gap-4 pt-4 mt-2 border-t" style={{ borderColor: 'var(--glass-border)' }}>
                                             <button
                                                 onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
-                                                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+                                                className="flex-1 py-4 rounded-xl font-bold transition-all hover:opacity-80"
                                                 style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
                                             >
-                                                Recusar Perfil
+                                                RECUSAR PERFIL
                                             </button>
                                             <button
                                                 onClick={() => { handleApproveEditor(viewingContact.id); setViewingContact(null); }}
-                                                className="flex-1 py-3 rounded-xl text-sm font-medium text-white transition-all hover:opacity-80"
-                                                style={{ background: '#10b981' }}
+                                                className="flex-1 py-4 rounded-xl font-bold text-white transition-all hover:opacity-80"
+                                                style={{ background: '#10b981', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
                                             >
-                                                Aprovar Editor
+                                                APROVAR EDITOR
                                             </button>
                                         </div>
                                     )}
@@ -1183,10 +1185,10 @@ const AdminDashboard: React.FC = () => {
                                             href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
+                                            className="flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white w-full transition-all hover:opacity-80"
                                             style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
                                         >
-                                            <MessageSquare size={16} /> Abrir no WhatsApp
+                                            <MessageSquare size={18} /> Iniciar Conversa no WhatsApp
                                         </a>
                                     )}
                                 </>
@@ -1194,22 +1196,22 @@ const AdminDashboard: React.FC = () => {
 
                             {/* Client-specific: Info & Wallet */}
                             {viewingContact.role === 'client' && (
-                                <div className="space-y-4">
+                                <>
                                     {/* Wallet Management */}
-                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                        <div className="flex items-center gap-2 mb-3">
+                                    <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2">
                                             <DollarSign size={16} style={{ color: 'var(--primary)' }} />
-                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Carteira do Cliente</span>
+                                            <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Carteira do Cliente</span>
                                         </div>
-                                        <div className="mb-4">
-                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saldo Atual</p>
-                                            <p className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                                        <div className="p-4 rounded-xl flex flex-col gap-1" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                                            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Saldo Atual Disponível</p>
+                                            <p className="text-3xl font-bold" style={{ color: 'var(--text-main)' }}>
                                                 R$ {(Number(viewingContact.balance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-3 mt-2">
                                             <div className="relative flex-1">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }}>R$</span>
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium" style={{ color: 'var(--text-muted)' }}>R$</span>
                                                 <input
                                                     type="text"
                                                     value={balanceAmount}
@@ -1218,26 +1220,26 @@ const AdminDashboard: React.FC = () => {
                                                         setBalanceAmount((Number(numeric) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
                                                     }}
                                                     placeholder="0,00"
-                                                    className="w-full text-sm rounded-xl py-2 pl-9 pr-3 outline-none"
-                                                    style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                                    className="w-full font-medium rounded-xl outline-none transition-all focus:border-cyan-500"
+                                                    style={{ padding: '14px 14px 14px 44px', background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
                                                     disabled={isAdjustingBalance}
                                                 />
                                             </div>
                                             <button 
                                                 onClick={() => handleAdjustBalance('TOPUP')}
                                                 disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
-                                                className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                className="px-6 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
                                                 style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
                                             >
-                                                Adicionar
+                                                Adicionar Saldo
                                             </button>
                                             <button 
                                                 onClick={() => handleAdjustBalance('WITHDRAWAL')}
                                                 disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
-                                                className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                className="px-6 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
                                                 style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
                                             >
-                                                Remover
+                                                Remover Saldo
                                             </button>
                                         </div>
                                     </div>
@@ -1247,19 +1249,19 @@ const AdminDashboard: React.FC = () => {
                                         const clientProjects = rawProjects.filter(p => p.client_id === viewingContact.id)
                                         const finishedCount = clientProjects.filter(p => ['Concluído', 'completed'].includes(p.status)).length
                                         return (
-                                            <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                <div className="flex items-center gap-2 mb-3">
+                                            <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                <div className="flex items-center gap-2">
                                                     <Briefcase size={16} style={{ color: 'var(--primary)' }} />
-                                                    <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Projetos</span>
+                                                    <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Métricas de Projetos</span>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Criado</p>
-                                                        <p className="text-xl font-bold" style={{ color: 'var(--text-main)' }}>{clientProjects.length}</p>
+                                                    <div className="p-4 rounded-xl flex flex-col justify-center items-center text-center" style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)' }}>
+                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Projetos Criados</p>
+                                                        <p className="text-3xl font-bold" style={{ color: 'var(--text-main)' }}>{clientProjects.length}</p>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Finalizados</p>
-                                                        <p className="text-xl font-bold text-green-500">{finishedCount}</p>
+                                                    <div className="p-4 rounded-xl flex flex-col justify-center items-center text-center" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#10b981' }}>Finalizados</p>
+                                                        <p className="text-3xl font-bold text-green-500">{finishedCount}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1268,17 +1270,25 @@ const AdminDashboard: React.FC = () => {
 
                                     {/* Lead Data if exists */}
                                     {viewingContact.is_lead && (
-                                        <div className="p-4 rounded-xl space-y-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                            <div className="flex items-center gap-2 mb-1">
+                                        <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <div className="flex items-center gap-2">
                                                 <Search size={16} style={{ color: 'var(--primary)' }} />
-                                                <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dados do Cadastro</span>
+                                                <span className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dados Comerciais (CRM)</span>
                                             </div>
-                                            {viewingContact.source && (
-                                                <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Origem: </span> <span style={{ color: 'var(--text-main)' }}>{viewingContact.source}</span></p>
-                                            )}
-                                            {viewingContact.status && (
-                                                <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Status CRM: </span> <span style={{ color: 'var(--text-main)' }}>{viewingContact.status}</span></p>
-                                            )}
+                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                                {viewingContact.source && (
+                                                    <div>
+                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Origem da Captação</p>
+                                                        <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.source}</p>
+                                                    </div>
+                                                )}
+                                                {viewingContact.status && (
+                                                    <div>
+                                                        <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Status no Funil</p>
+                                                        <p className="text-[15px] font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.status}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 
@@ -1288,13 +1298,13 @@ const AdminDashboard: React.FC = () => {
                                             href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
-                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
+                                            className="flex items-center justify-center gap-2 py-4 rounded-xl text-sm font-bold text-white w-full transition-all hover:opacity-80"
+                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
                                         >
-                                            <MessageSquare size={16} /> Abrir no WhatsApp
+                                            <MessageSquare size={18} /> Iniciar Conversa no WhatsApp
                                         </a>
                                     )}
-                                </div>
+                                </>
                             )}
                         </div>
                     </div>
