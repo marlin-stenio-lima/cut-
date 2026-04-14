@@ -41,6 +41,8 @@ const AdminDashboard: React.FC = () => {
     const [rawTxs, setRawTxs] = useState<any[]>([])
     const [rawProjects, setRawProjects] = useState<any[]>([])
     const [dashboardDateFilter, setDashboardDateFilter] = useState('30d')
+    const [balanceAmount, setBalanceAmount] = useState('')
+    const [isAdjustingBalance, setIsAdjustingBalance] = useState(false)
     useEffect(() => { loadAdminData() }, [])
     useEffect(() => {
         if (!rawTxs || !rawProjects) return;
@@ -221,6 +223,38 @@ const AdminDashboard: React.FC = () => {
     const handleDeleteLead = async (id: string) => {
         if (!confirm('Excluir?')) return
         try { await supabase.from('leads').delete().eq('id', id); loadAdminData() } catch { alert('Erro') }
+    }
+
+    const handleAdjustBalance = async (type: 'TOPUP' | 'WITHDRAWAL') => {
+        if (!viewingContact || viewingContact.role !== 'client' || !balanceAmount) return;
+        const amount = Number(balanceAmount.replace(/\D/g, '')) / 100
+        if (amount <= 0) return;
+        
+        setIsAdjustingBalance(true)
+        try {
+            const currentBal = Number(viewingContact.balance || 0);
+            const newBal = type === 'TOPUP' ? currentBal + amount : currentBal - amount;
+
+            const res = await supabase.from('profiles').update({ balance: newBal }).eq('id', viewingContact.id)
+            if (res.error) throw res.error;
+
+            await supabase.from('wallet_transactions').insert({
+                user_id: viewingContact.id,
+                amount: type === 'TOPUP' ? amount : amount, // UI logic keeps amount positive, type indicates direction
+                type: type,
+                status: 'SUCCESS',
+                description: type === 'TOPUP' ? 'Adição de saldo via Admin' : 'Remoção de saldo via Admin'
+            })
+
+            // Update local state to reflect change instantly
+            setViewingContact({ ...viewingContact, balance: newBal })
+            setBalanceAmount('')
+            loadAdminData()
+        } catch (e: any) {
+            alert('Erro ao ajustar saldo: ' + e.message)
+        } finally {
+            setIsAdjustingBalance(false)
+        }
     }
 
     const filteredLeads = leads.filter(l =>
@@ -1114,17 +1148,109 @@ const AdminDashboard: React.FC = () => {
                                 </>
                             )}
 
-                            {/* Client-specific: WhatsApp */}
-                            {viewingContact.role === 'client' && viewingContact.whatsapp && (
-                                <a
-                                    href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
-                                    style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
-                                >
-                                    <MessageSquare size={16} /> Abrir no WhatsApp
-                                </a>
+                            {/* Client-specific: Info & Wallet */}
+                            {viewingContact.role === 'client' && (
+                                <div className="space-y-4">
+                                    {/* Wallet Management */}
+                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <DollarSign size={16} style={{ color: 'var(--primary)' }} />
+                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Carteira do Cliente</span>
+                                        </div>
+                                        <div className="mb-4">
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saldo Atual</p>
+                                            <p className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                                                R$ {(Number(viewingContact.balance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative flex-1">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }}>R$</span>
+                                                <input
+                                                    type="text"
+                                                    value={balanceAmount}
+                                                    onChange={(e) => {
+                                                        const numeric = e.target.value.replace(/\D/g, '')
+                                                        setBalanceAmount((Number(numeric) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                                                    }}
+                                                    placeholder="0,00"
+                                                    className="w-full text-sm rounded-xl py-2 pl-9 pr-3 outline-none"
+                                                    style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--text-main)' }}
+                                                    disabled={isAdjustingBalance}
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={() => handleAdjustBalance('TOPUP')}
+                                                disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
+                                                className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                                            >
+                                                Adicionar
+                                            </button>
+                                            <button 
+                                                onClick={() => handleAdjustBalance('WITHDRAWAL')}
+                                                disabled={isAdjustingBalance || !balanceAmount || balanceAmount === '0,00'}
+                                                className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Project Stats */}
+                                    {(() => {
+                                        const clientProjects = rawProjects.filter(p => p.client_id === viewingContact.id)
+                                        const finishedCount = clientProjects.filter(p => ['Concluído', 'completed'].includes(p.status)).length
+                                        return (
+                                            <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <Briefcase size={16} style={{ color: 'var(--primary)' }} />
+                                                    <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Projetos</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Criado</p>
+                                                        <p className="text-xl font-bold" style={{ color: 'var(--text-main)' }}>{clientProjects.length}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Finalizados</p>
+                                                        <p className="text-xl font-bold text-green-500">{finishedCount}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })()}
+
+                                    {/* Lead Data if exists */}
+                                    {viewingContact.is_lead && (
+                                        <div className="p-4 rounded-xl space-y-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Search size={16} style={{ color: 'var(--primary)' }} />
+                                                <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Dados do Cadastro</span>
+                                            </div>
+                                            {viewingContact.source && (
+                                                <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Origem: </span> <span style={{ color: 'var(--text-main)' }}>{viewingContact.source}</span></p>
+                                            )}
+                                            {viewingContact.status && (
+                                                <p className="text-sm"><span style={{ color: 'var(--text-muted)' }}>Status CRM: </span> <span style={{ color: 'var(--text-main)' }}>{viewingContact.status}</span></p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* WhatsApp */}
+                                    {viewingContact.whatsapp && (
+                                        <a
+                                            href={`https://wa.me/${viewingContact.whatsapp.replace(/\D/g, '')}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white w-full transition-all hover:opacity-80"
+                                            style={{ background: '#10b981', textDecoration: 'none', display: 'flex' }}
+                                        >
+                                            <MessageSquare size={16} /> Abrir no WhatsApp
+                                        </a>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
