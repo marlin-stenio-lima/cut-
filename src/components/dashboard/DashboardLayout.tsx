@@ -17,7 +17,8 @@ import {
     Users,
     Wallet,
     TrendingUp,
-    Filter
+    Filter,
+    Phone
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -57,6 +58,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role }) => 
         { icon: <Users size={20} />, label: 'Base Clientes', path: '/dashboard/admin/clients' },
         { icon: <TrendingUp size={20} />, label: 'Base Editores', path: '/dashboard/admin/editors' },
         { icon: <Filter size={20} />, label: 'CRM Projetos', path: '/dashboard/admin/crm' },
+        { icon: <Phone size={20} />, label: 'Central WhatsApp', path: '/dashboard/admin/whatsapp' },
         { icon: <MessageSquare size={20} />, label: 'Mensagens', path: '/dashboard/chat' },
     ]
 

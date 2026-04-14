@@ -112,11 +112,7 @@ const LoginPage: React.FC = () => {
 
                 </form>
 
-                <div style={{ marginTop: '32px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '24px' }}>
-                    <p style={{ color: '#888', fontSize: '0.9rem' }}>
-                        Não tem uma conta? <Link to="/register" style={{ color: '#ffffff', fontWeight: 600, textDecoration: 'none' }} className="hover-underline">Criar conta grátis</Link>
-                    </p>
-                </div>
+
 
             </div>
 

@@ -4,7 +4,7 @@ import {
     Shield, Users, TrendingUp, Loader2, X,
     DollarSign, Eye, Briefcase, ExternalLink, Search, Plus,
     CheckCircle, RotateCcw, Phone, Mail, MapPin,
-    MessageSquare, Calendar, Star, Code, Clock, Trash2, MoreHorizontal
+    MessageSquare, Calendar, Star, Clock, Trash2, MoreHorizontal
 } from 'lucide-react'
 import { asaasService } from '../../services/asaas'
 import { supabase } from '../../services/supabase'

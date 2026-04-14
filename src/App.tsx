@@ -9,7 +9,6 @@ import LandingPage from './pages/LandingPage'
 import EditorRegistrationPage from './pages/auth/EditorRegistrationPage'
 import EditorThanksPage from './pages/auth/EditorThanksPage'
 import MarketplacePage from './pages/MarketplacePage'
-import ProfileSelectionPage from './pages/auth/ProfileSelectionPage'
 import './App.css'
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -44,11 +43,6 @@ function App() {
               <Route path="/register/editor" element={<EditorRegistrationPage />} />
               <Route path="/register/thanks" element={<EditorThanksPage />} />
               <Route path="/marketplace" element={<MarketplacePage />} />
-              <Route path="/profile-selection" element={
-                <PrivateRoute>
-                  <ProfileSelectionPage />
-                </PrivateRoute>
-              } />
               <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
               <Route path="/dashboard/*" element={
                 <PrivateRoute>

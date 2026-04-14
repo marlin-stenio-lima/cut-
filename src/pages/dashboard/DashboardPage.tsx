@@ -14,6 +14,7 @@ import EditorOnboarding from './editor/EditorOnboarding'
 import MarketplacePage from './client/MarketplacePage'
 import BankPage from './editor/BankPage'
 import AdminDashboard from './AdminDashboard'
+import AdminWhatsApp from './AdminWhatsApp'
 
 const DashboardPage: React.FC = () => {
     const { profile, loading, user } = useAuth()
@@ -25,24 +26,21 @@ const DashboardPage: React.FC = () => {
         return null
     }
 
-    // If logged in but no profile/role yet, redirect to selection
-    if (!profile || !profile.role) {
-        console.log('[DashboardPage] No profile/role found, redirecting to selection')
-        return <Navigate to="/profile-selection" />
-    }
+    // Default to client if no role is explicitly set (fallback)
+    const effectiveRole = profile?.role || 'client'
 
     // New: If editor and missing onboarding data, force onboarding
-    if (profile.role === 'editor' && !profile.portfolio_url && !profile.onboarding_status && !window.location.pathname.includes('onboarding')) {
+    if (effectiveRole === 'editor' && !profile?.portfolio_url && !profile?.onboarding_status && !window.location.pathname.includes('onboarding')) {
         return <Navigate to="/dashboard/editor/onboarding" />
     }
 
     // New: Block editors awaiting approval or rejected
-    if (profile.role === 'editor' && profile.onboarding_status !== 'approved') {
+    if (effectiveRole === 'editor' && profile?.onboarding_status !== 'approved') {
         console.log('[DashboardPage] Editor not approved yet, redirecting to thanks/status page')
         return <Navigate to="/register/thanks" replace />
     }
 
-    const role = (profile.onboarding_status === 'approved' ? 'editor' : profile.role) as 'client' | 'editor' | 'admin'
+    const role = (profile?.onboarding_status === 'approved' ? 'editor' : effectiveRole) as 'client' | 'editor' | 'admin'
 
     return (
         <DashboardLayout role={role}>
@@ -85,6 +83,7 @@ const DashboardPage: React.FC = () => {
                         <Route path="admin/clients" element={<AdminDashboard />} />
                         <Route path="admin/editors" element={<AdminDashboard />} />
                         <Route path="admin/crm" element={<AdminDashboard />} />
+                        <Route path="admin/whatsapp" element={<AdminWhatsApp />} />
                     </>
                 )}
 

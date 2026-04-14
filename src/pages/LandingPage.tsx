@@ -35,16 +35,6 @@ const LandingPage: React.FC = () => {
 
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <Link to="/login" style={{ color: '#ffffff', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>Entrar</Link>
-                    <Link to="/register" style={{
-                        padding: '10px 20px',
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        borderRadius: '6px',
-                        background: '#ffffff',
-                        color: '#000000',
-                        textDecoration: 'none',
-                        transition: 'transform 0.2s'
-                    }} className="btn-hover-scale">Criar Conta</Link>
                 </div>
             </header>
 
@@ -95,7 +85,7 @@ const LandingPage: React.FC = () => {
                 </p>
 
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <Link to="/marketplace" style={{
+                    <Link to="/register" style={{
                         background: '#07b6d5',
                         color: '#000000',
                         padding: '16px 32px',
@@ -108,7 +98,7 @@ const LandingPage: React.FC = () => {
                         gap: '8px',
                         transition: 'all 0.2s'
                     }} className="btn-hover-solid">
-                        Encontrar Editores <ArrowRight size={18} />
+                        Contratar Editores <ArrowRight size={18} />
                     </Link>
                     <Link to="/register/editor" style={{
                         padding: '16px 32px',
@@ -244,7 +234,7 @@ const LandingPage: React.FC = () => {
                     <p style={{ color: '#a0a0a0', fontSize: '1.1rem', marginBottom: '40px', lineHeight: 1.6 }}>
                         Junte-se a centenas de empresas que já otimizaram sua produção audiovisual com a nossa rede qualificada.
                     </p>
-                    <Link to="/marketplace" style={{
+                    <Link to="/register" style={{
                         background: '#ffffff',
                         color: '#000000',
                         padding: '18px 40px',
@@ -257,7 +247,7 @@ const LandingPage: React.FC = () => {
                         gap: '8px',
                         transition: 'transform 0.2s'
                     }} className="btn-hover-scale">
-                        Explorar Editores Gratuitamente
+                        Contratar Editores
                     </Link>
                 </div>
             </section>
