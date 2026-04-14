@@ -31,6 +31,7 @@ const AdminDashboard: React.FC = () => {
     const [leads, setLeads] = useState<any[]>([])
     const [leadSearch, setLeadSearch] = useState('')
     const [editorSearch, setEditorSearch] = useState('')
+    const [editorFilter, setEditorFilter] = useState<'all' | 'pending'>('all')
     const [selectedEditors, setSelectedEditors] = useState<string[]>([])
     const [clientSearch, setClientSearch] = useState('')
     const [selectedClients, setSelectedClients] = useState<string[]>([])
@@ -633,10 +634,18 @@ const AdminDashboard: React.FC = () => {
 
                         {/* Tabs */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '24px', borderBottom: '1px solid var(--glass-border)' }}>
-                           <button className="text-sm font-medium" style={{ padding: '12px 0', borderBottom: '2px solid var(--primary)', color: 'var(--primary)', background: 'transparent' }}>
+                           <button 
+                               onClick={() => setEditorFilter('all')}
+                               className="text-sm font-medium transition-all" 
+                               style={{ padding: '12px 0', borderBottom: editorFilter === 'all' ? '2px solid var(--primary)' : '2px solid transparent', color: editorFilter === 'all' ? 'var(--primary)' : 'var(--text-muted)', background: 'transparent', outline: 'none' }}>
                                Todos os Editores
                            </button>
-
+                           <button 
+                               onClick={() => setEditorFilter('pending')}
+                               className="text-sm font-medium transition-all" 
+                               style={{ padding: '12px 0', borderBottom: editorFilter === 'pending' ? '2px solid #eab308' : '2px solid transparent', color: editorFilter === 'pending' ? '#eab308' : 'var(--text-muted)', background: 'transparent', outline: 'none' }}>
+                               Aguardando Aprovação ({allEditors.filter(e => e.onboarding_status === 'pending').length})
+                           </button>
                         </div>
 
                         {/* Filter Bar */}
@@ -679,7 +688,11 @@ const AdminDashboard: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {allEditors.filter(e => !editorSearch || e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) || e.email?.toLowerCase().includes(editorSearch.toLowerCase())).length === 0 ? (
+                                    {allEditors.filter(e => {
+                                        if (editorFilter === 'pending' && e.onboarding_status !== 'pending') return false;
+                                        if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !e.email?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
+                                        return true;
+                                    }).length === 0 ? (
                                         <tr>
                                             <td colSpan={7} style={{ padding: '80px 16px', textAlign: 'center' }}>
                                                 <Briefcase size={36} style={{ margin: '0 auto 12px auto', opacity: 0.2, color: 'var(--text-muted)' }} />
@@ -687,7 +700,11 @@ const AdminDashboard: React.FC = () => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        allEditors.filter(e => !editorSearch || e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) || e.email?.toLowerCase().includes(editorSearch.toLowerCase())).map(e => (
+                                        allEditors.filter(e => {
+                                            if (editorFilter === 'pending' && e.onboarding_status !== 'pending') return false;
+                                            if (editorSearch && !e.full_name?.toLowerCase().includes(editorSearch.toLowerCase()) && !e.email?.toLowerCase().includes(editorSearch.toLowerCase())) return false;
+                                            return true;
+                                        }).map(e => (
                                             <tr key={e.id} className="transition-all hover:bg-[rgba(255,255,255,0.02)] cursor-pointer" style={{ borderBottom: '1px solid var(--glass-border)' }} onClick={() => setViewingContact(e)}>
                                                 <td style={{ padding: '16px', textAlign: 'center' }} onClick={(ev) => ev.stopPropagation()}>
                                                     <input type="checkbox" className="rounded cursor-pointer" 
@@ -720,10 +737,10 @@ const AdminDashboard: React.FC = () => {
                                                 </td>
                                                 <td style={{ padding: '16px' }}>
                                                     <span style={{
-                                                        display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500',
-                                                        background: e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                                                        color: e.onboarding_status === 'approved' ? '#10b981' : '#f59e0b',
-                                                        border: `1px solid ${e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`
+                                                        display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                                                        background: e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.1)' : 'rgba(234,179,8,0.15)',
+                                                        color: e.onboarding_status === 'approved' ? '#10b981' : '#eab308',
+                                                        border: `1px solid ${e.onboarding_status === 'approved' ? 'rgba(16,185,129,0.2)' : 'rgba(234,179,8,0.4)'}`
                                                     }}>
                                                         {e.onboarding_status === 'approved' ? 'Editor Ativo' : 'Pendente'}
                                                     </span>
@@ -1031,105 +1048,132 @@ const AdminDashboard: React.FC = () => {
                             {viewingContact.role === 'editor' && (
                                 <>
                                     {/* Skills & Experience */}
-                                    {(viewingContact.software_skills?.length > 0 || viewingContact.editing_experience) && (
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Habilidades</p>
-                                            <div className="space-y-3">
-                                                {viewingContact.software_skills?.length > 0 && (
-                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Code size={13} style={{ color: 'var(--primary)' }} />
-                                                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Softwares</span>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {viewingContact.software_skills.map((s: string) => (
-                                                                <span key={s} className="px-2 py-0.5 rounded text-xs"
-                                                                    style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                                                                    {s}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {viewingContact.editing_experience && (
-                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Star size={13} style={{ color: 'var(--primary)' }} />
-                                                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Experiência</span>
-                                                        </div>
-                                                        <p className="text-sm" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Star size={16} style={{ color: 'var(--primary)' }} />
+                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Habilidades e Experiência</span>
                                         </div>
-                                    )}
+                                        <div className="space-y-4">
+                                            {viewingContact.software_skills?.length > 0 && (
+                                                <div>
+                                                    <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Softwares</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {viewingContact.software_skills.map((s: string) => (
+                                                            <span key={s} className="px-2.5 py-1 rounded-lg text-xs"
+                                                                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                                {s}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {viewingContact.editing_experience && (
+                                                <div>
+                                                    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Anos de Experiência</p>
+                                                    <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.editing_experience}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     {/* Availability & Price */}
-                                    {(viewingContact.weekly_availability || viewingContact.price_expectation) && (
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Disponibilidade</p>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {viewingContact.weekly_availability && (
-                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Clock size={13} style={{ color: 'var(--primary)' }} />
-                                                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Horas/semana</span>
-                                                        </div>
-                                                        <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability}</p>
-                                                    </div>
-                                                )}
-                                                {viewingContact.price_expectation && (
-                                                    <div className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão</p>
-                                                        <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation}</p>
-                                                    </div>
-                                                )}
+                                    <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Clock size={16} style={{ color: 'var(--primary)' }} />
+                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Disponibilidade</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Horas/semana</p>
+                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.weekly_availability || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Pretensão</p>
+                                                <p className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{viewingContact.price_expectation || '—'}</p>
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {/* Portfolio */}
-                                    {viewingContact.portfolio_url && (
-                                        <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
-                                            className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-                                            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--primary)', textDecoration: 'none', display: 'flex' }}>
-                                            <span>Ver portfólio externo</span>
-                                            <ExternalLink size={14} />
-                                        </a>
-                                    )}
+                                    {/* Portfolio and Motivation */}
+                                    <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Code size={16} style={{ color: 'var(--primary)' }} />
+                                            <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Portfólio & Perfil</span>
+                                        </div>
+                                        {viewingContact.portfolio_url && (
+                                            <a href={viewingContact.portfolio_url} target="_blank" rel="noreferrer"
+                                                className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80 mt-2"
+                                                style={{ background: 'var(--bg-deep)', border: '1px solid var(--glass-border)', color: 'var(--primary)', textDecoration: 'none', display: 'flex' }}>
+                                                <span>Acessar Portfólio Externo</span>
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        )}
+                                        {viewingContact.motivation && (
+                                            <div className="mt-4">
+                                                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Motivação</p>
+                                                <p className="text-sm py-2" style={{ color: 'var(--text-main)' }}>
+                                                    {viewingContact.motivation}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Bank Information (PIX) */}
+                                    <div className="p-4 rounded-xl flex items-center gap-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                        <DollarSign size={24} style={{ color: '#10b981' }} />
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Chave PIX (Para Saques)</p>
+                                            <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-main)' }}>
+                                                {viewingContact.pix_key ? `${viewingContact.pix_key_type || ''} - ${viewingContact.pix_key}` : 'Visualizando dados pelo Asaas / Não cadastrado no CRM ainda'}
+                                            </p>
+                                        </div>
+                                    </div>
 
                                     {/* Documents */}
                                     {(editorUrls.identity || editorUrls.face) && (
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Documentos</p>
-                                            <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <Shield size={16} style={{ color: 'var(--primary)' }} />
+                                                <span className="font-semibold text-sm uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Documentação</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
                                                 {editorUrls.identity ? (
                                                     <div>
-                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Documento</p>
-                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-32 object-cover rounded-xl" />
+                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Documento Oficial</p>
+                                                        <img src={editorUrls.identity} alt="Doc" className="w-full h-32 object-cover rounded-xl border border-white/5" />
                                                     </div>
                                                 ) : (
-                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Sem documento</div>
+                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem doc</div>
                                                 )}
                                                 {editorUrls.face ? (
                                                     <div>
-                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Selfie</p>
-                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-32 object-cover rounded-xl" />
+                                                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Selfie (Prova de vida)</p>
+                                                        <img src={editorUrls.face} alt="Selfie" className="w-full h-32 object-cover rounded-xl border border-white/5" />
                                                     </div>
                                                 ) : (
-                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie</div>
+                                                    <div className="h-32 rounded-xl flex items-center justify-center text-xs" style={{ background: 'var(--bg-deep)', border: '1px dashed var(--glass-border)', color: 'var(--text-muted)' }}>Sem selfie</div>
                                                 )}
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Motivation */}
-                                    {viewingContact.motivation && (
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Motivação</p>
-                                            <p className="text-sm p-3 rounded-xl" style={{ color: 'var(--text-main)', background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                                                {viewingContact.motivation}
-                                            </p>
+                                    {/* Approval Actions placed at the bottom for easy access */}
+                                    {viewingContact.onboarding_status === 'pending' && (
+                                        <div className="flex gap-3 pt-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
+                                            <button
+                                                onClick={() => { setViewingContact(null); setShowEditorRejectModal(viewingContact.id); }}
+                                                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+                                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                            >
+                                                Recusar Perfil
+                                            </button>
+                                            <button
+                                                onClick={() => { handleApproveEditor(viewingContact.id); setViewingContact(null); }}
+                                                className="flex-1 py-3 rounded-xl text-sm font-medium text-white transition-all hover:opacity-80"
+                                                style={{ background: '#10b981' }}
+                                            >
+                                                Aprovar Editor
+                                            </button>
                                         </div>
                                     )}
 
