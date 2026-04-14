@@ -37,7 +37,10 @@ const AdminDashboard: React.FC = () => {
     const [showLeadModal, setShowLeadModal] = useState(false)
     const [editingLead, setEditingLead] = useState<any | null>(null)
     const [leadForm, setLeadForm] = useState({ full_name: '', email: '', whatsapp: '', status: 'Novo', source: '', notes: '' })
-    const [overviewStats, setOverviewStats] = useState({ totalRevenue: 0, completedProjects: 0, statusCounts: {} as Record<string, number>, totalProjects: 0 })
+    const [overviewStats, setOverviewStats] = useState({ totalRevenue: 0, commissionTotal: 0, completedProjects: 0, ongoingProjects: 0, statusCounts: {} as Record<string, number>, totalProjects: 0 })
+    const [rawTxs, setRawTxs] = useState<any[]>([])
+    const [rawProjects, setRawProjects] = useState<any[]>([])
+    const [dashboardDateFilter, setDashboardDateFilter] = useState('30d')
 
     useEffect(() => { loadAdminData() }, [])
     useEffect(() => {
@@ -79,27 +82,18 @@ const AdminDashboard: React.FC = () => {
                 supabase.from('system_configs').select('*'),
                 supabase.from('profiles').select('*, email:contact_email').order('created_at', { ascending: false }),
                 supabase.from('leads').select('*').order('created_at', { ascending: false }),
-                supabase.from('projects').select('status, is_pool'),
-                supabase.from('wallet_transactions').select('amount').eq('type', 'deposit').eq('status', 'SUCCESS')
+                supabase.from('projects').select('status, is_pool, created_at'),
+                supabase.from('wallet_transactions').select('amount, created_at, user_id').in('type', ['deposit', 'TOPUP', 'PAYMENT']).eq('status', 'SUCCESS')
             ])
 
             const withDr: any[] = withDrRes.data || [];
 
             if (projectsReq.data && txsReq.data) {
-                const totalRev = txsReq.data.reduce((a: number, c: any) => a + (c.amount || 0), 0)
-                const completed = projectsReq.data.filter((p: any) => p.status === 'Concluído').length
-                const statusCounts: Record<string, number> = {};
-                projectsReq.data.forEach((p: any) => {
-                    const st = p.status || 'Novo projeto';
-                    statusCounts[st] = (statusCounts[st] || 0) + 1;
-                });
-
-                setOverviewStats({
-                    totalRevenue: totalRev,
-                    completedProjects: completed,
-                    statusCounts,
-                    totalProjects: projectsReq.data.length || 1
-                })
+                setRawProjects(projectsReq.data)
+                setRawTxs(txsReq.data)
+                
+                const platformCommissionMatch = configs.data?.find((c: any) => c.key === 'platform_commission')
+                if (platformCommissionMatch) setCommissionPercentage(Number(platformCommissionMatch.value))
             }
 
             try {
@@ -199,6 +193,32 @@ const AdminDashboard: React.FC = () => {
         l.whatsapp?.includes(leadSearch)
     )
 
+    const generateChartData = () => {
+        const days = 14;
+        const data = [];
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        let maxRev = 1;
+        
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(now)
+            date.setDate(date.getDate() - i)
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            
+            const dayTxs = rawTxs.filter(tx => {
+                if (!tx.created_at) return false;
+                const txDate = new Date(tx.created_at);
+                return txDate.getDate() === date.getDate() && txDate.getMonth() === date.getMonth() && txDate.getFullYear() === date.getFullYear()
+            })
+            
+            const rev = dayTxs.reduce((a,c)=>a+Number(c.amount),0)
+            const com = rev * (commissionPercentage / 100)
+            if (rev > maxRev) maxRev = rev;
+            data.push({ date: dateStr, rev, com })
+        }
+        return { data, maxRev }
+    }
+
     if (loading && !pendingWithdrawals.length && !pendingEditors.length) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -211,28 +231,40 @@ const AdminDashboard: React.FC = () => {
         <div className="h-full overflow-y-auto" style={{ padding: '32px 40px', color: 'var(--text-main)', background: 'var(--bg-deep)' }}>
             <div style={{ maxWidth: 1600, margin: '0 auto' }}>
 
-
-
                 {/* ─── Overview (Visão Geral) ─── */}
                 {activeTab === 'overview' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        <div>
-                            <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)', marginBottom: '8px' }}>Visão Geral</h2>
-                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Métricas detalhadas de performance da plataforma.</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                            <div>
+                                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)', marginBottom: '8px' }}>Visão Geral</h2>
+                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Métricas detalhadas de performance da plataforma.</p>
+                            </div>
+                            <select 
+                                value={dashboardDateFilter} 
+                                onChange={(e) => setDashboardDateFilter(e.target.value)}
+                                style={{ padding: '10px 16px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-main)', outline: 'none' }}
+                            >
+                                <option value="7d">Últimos 7 dias</option>
+                                <option value="30d">Últimos 30 dias</option>
+                                <option value="90d">Últimos 90 dias</option>
+                                <option value="year">Último ano</option>
+                                <option value="all">Todo o período</option>
+                            </select>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                             {[
-                                { label: 'Receita Total', value: `R$ ${overviewStats.totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, icon: TrendingUp, color: 'var(--primary)' },
-                                { label: 'Projetos Concluídos', value: overviewStats.completedProjects.toString(), icon: Briefcase, color: 'var(--secondary)' },
-                                { label: 'Clientes Ativos', value: allClients.length, icon: Users, color: '#10b981' },
+                                { label: 'Faturamento', value: `R$ ${overviewStats.totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, icon: TrendingUp, color: 'var(--primary)' },
+                                { label: 'Comissão (Plataforma)', value: `R$ ${overviewStats.commissionTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, icon: DollarSign, color: '#10b981' },
+                                { label: 'Clientes Ativos', value: allClients.length, icon: Users, color: '#3b82f6' },
                                 { label: 'Editores Ativos', value: stats.activeEditors, icon: Star, color: '#f59e0b' },
+                                { label: 'Projetos em Andamento', value: overviewStats.ongoingProjects.toString(), icon: Clock, color: '#8b5cf6' },
+                                { label: 'Projetos Concluídos', value: overviewStats.completedProjects.toString(), icon: CheckCircle, color: '#ec4899' },
                             ].map((kpi, idx) => (
                                 <div key={idx} style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${kpi.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color }}>
                                             <kpi.icon size={20} />
                                         </div>
-                                        <div style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: '11px', fontWeight: 'bold' }}>+12% este mês</div>
                                     </div>
                                     <div>
                                         <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{kpi.label}</p>
@@ -241,40 +273,53 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        {/* Fake Charts Block for Glow Up */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                              <div className="lg:col-span-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '32px' }}>
-                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Fluxo de Caixa Anual</h3>
-                                 <div style={{ height: '300px', width: '100%', background: 'linear-gradient(180deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%)', borderBottom: '2px solid var(--primary)', position: 'relative', borderRadius: '8px' }}>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '10%', width: '40px', height: '40%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '25%', width: '40px', height: '60%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '40%', width: '40px', height: '55%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '55%', width: '40px', height: '80%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '70%', width: '40px', height: '95%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                    <div style={{ position: 'absolute', bottom: '0', left: '85%', width: '40px', height: '70%', background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.8 }}></div>
-                                 </div>
+                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Fluxo de Caixa (Últimos 14 Dias)</h3>
+                                 {(() => {
+                                     const chart = generateChartData();
+                                     return (
+                                         <>
+                                            <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '20px 0 0 0', position: 'relative', borderBottom: '2px solid rgba(255,255,255,0.1)' }}>
+                                                {chart.data.map((day, idx) => (
+                                                    <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                        <div style={{ height: '240px', width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '4px', position: 'relative' }}>
+                                                            <div style={{ width: '12px', height: `${Math.max((day.rev / chart.maxRev) * 100, 2)}%`, background: 'var(--primary)', borderRadius: '4px 4px 0 0', opacity: 0.9 }} title={`Faturamento: R$ ${day.rev.toFixed(2)}`}></div>
+                                                            <div style={{ width: '12px', height: `${Math.max((day.com / chart.maxRev) * 100, 2)}%`, background: '#10b981', borderRadius: '4px 4px 0 0', opacity: 0.9 }} title={`Comissão: R$ ${day.com.toFixed(2)}`}></div>
+                                                        </div>
+                                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>{day.date.substring(0,5)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '24px', marginTop: '24px', justifyContent: 'center' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '12px', height: '12px', background: 'var(--primary)', borderRadius: '4px' }}></div><span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>Faturamento</span></div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '12px', height: '12px', background: '#10b981', borderRadius: '4px' }}></div><span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>Comissão</span></div>
+                                            </div>
+                                         </>
+                                     )
+                                 })()}
                              </div>
                              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '32px' }}>
-                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Status dos Projetos</h3>
-                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '40px' }}>
-                                     {Object.entries(overviewStats.statusCounts || {}).map(([status, count], i) => {
-                                         const pct = Math.round(((count as number) / Math.max(overviewStats.totalProjects || 1, 1)) * 100);
-                                         const colors = ['var(--primary)', 'var(--secondary)', '#a855f7', '#ec4899', '#f59e0b', '#10b981'];
-                                         const color = colors[i % colors.length];
-                                         return (
-                                           <div key={status}>
-                                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>{status}</span>
-                                                  <span style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: 'bold' }}>{pct}% ({count})</span>
-                                               </div>
-                                               <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                                   <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px' }}></div>
-                                               </div>
-                                           </div>
-                                         )
-                                     })}
-                                     {(!overviewStats.statusCounts || Object.keys(overviewStats.statusCounts).length === 0) && (
-                                         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum projeto encontrado.</p>
+                                 <h3 className="text-lg font-bold mb-6" style={{ color: 'var(--text-main)' }}>Transações Recentes</h3>
+                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+                                     {rawTxs.slice(0, 7).map((tx, i) => (
+                                         <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--glass-border)' }}>
+                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16,185,129,0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                     <DollarSign size={16} />
+                                                 </div>
+                                                 <div>
+                                                     <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>Depósito / Recarga</p>
+                                                     <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(tx.created_at).toLocaleDateString('pt-BR')} às {new Date(tx.created_at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
+                                                 </div>
+                                             </div>
+                                             <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#10b981' }}>
+                                                 +R$ {Number(tx.amount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                             </div>
+                                         </div>
+                                     ))}
+                                     {rawTxs.length === 0 && (
+                                         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhuma transação encontrada.</p>
                                      )}
                                  </div>
                              </div>
